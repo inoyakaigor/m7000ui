@@ -14,6 +14,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Assets\M7000.ico</ApplicationIcon>
+    <!-- Версия по дате сборки: yy.M.d.HHmm (HHmm = минуты суток, растёт в течение дня) -->
+    <Version>$([System.DateTime]::Now.ToString('yy.M.d')).$([System.DateTime]::Now.ToString('HHmm'))</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="H.NotifyIcon.WinUI" Version="2.4.2-dev.22" />
@@ -24,10 +26,12 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\M7000Lib\M7000Lib.csproj" />
-    <Content Include="Assets\envelope.png;Assets\M7000.ico;Assets\app.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\envelope.png;Assets\M7000.ico;Assets\app.png"
+      CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- dotnet publish в unpackaged-режиме теряет PRI и .xbf (скомпилированный XAML) — без них крэш на старте. -->
+  <!-- dotnet publish в unpackaged-режиме теряет PRI и .xbf (скомпилированный XAML) — без них крэш
+  на старте. -->
   <Target Name="CopyXamlToPublish" AfterTargets="Publish">
     <ItemGroup>
       <CompiledXaml Include="$(OutDir)$(TargetName).pri;$(OutDir)*.xbf" />
