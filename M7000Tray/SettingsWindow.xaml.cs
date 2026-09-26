@@ -9,13 +9,14 @@ public sealed partial class SettingsWindow : Window
     readonly Action _onSaved;
     readonly double _shownLimit, _shownRemaining;
 
-    public SettingsWindow(Settings settings, string status, Action onSaved)
+    public SettingsWindow(Settings settings, string status, string? simNumber, Action onSaved)
     {
         InitializeComponent();
         _settings = settings;
         _onSaved = onSaved;
 
         StatusText.Text = status;
+        SimText.Text = string.IsNullOrEmpty(simNumber) ? "Номер SIM: —" : simNumber;
         PasswordInput.Password = settings.Password;
         LimitInput.Value = _shownLimit = settings.LimitGb;
         _shownRemaining = Math.Round(Math.Max(0, settings.LimitGb - settings.UsedBytes / Settings.BytesPerGb), 2);
@@ -32,7 +33,7 @@ public sealed partial class SettingsWindow : Window
             p.IsMinimizable = false;
         }
         double scale = GetDpiForSystem() / 96.0;
-        int w = (int)(340 * scale), h = (int)(410 * scale);
+        int w = (int)(340 * scale), h = (int)(430 * scale);
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(area.X + area.Width - w - 12, area.Y + area.Height - h - 12, w, h));
     }

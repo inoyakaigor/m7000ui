@@ -23,6 +23,7 @@ public partial class App : Application
     bool _polling;
     bool _loginRejected; // не долбим роутер неверным паролем, пока пользователь не сохранит новый
     string _status = "Загрузка…";
+    string? _simNumber;
 
     public App()
     {
@@ -95,6 +96,7 @@ public partial class App : Application
         try
         {
             var snap = await Task.Run(() => RouterClient.PollAsync(_settings.Password));
+            _simNumber = snap.SimNumber;
 
             _settings.UsedBytes += Settings.RouterDelta(_settings.LastRouterTotal, snap.RouterTotalBytes);
             _settings.LastRouterTotal = snap.RouterTotalBytes;
@@ -164,7 +166,7 @@ public partial class App : Application
     void OpenSettings()
     {
         if (_settingsWindow is not null) { _settingsWindow.Activate(); return; }
-        _settingsWindow = new SettingsWindow(_settings, _status, () => { _loginRejected = false; ShowTraffic(); _ = PollAsync(); });
+        _settingsWindow = new SettingsWindow(_settings, _status, _simNumber, () => { _loginRejected = false; ShowTraffic(); _ = PollAsync(); });
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Activate();
     }

@@ -9,7 +9,10 @@
     </Window.SystemBackdrop>
 
     <StackPanel Padding="20" Spacing="14">
-        <TextBlock x:Name="StatusText" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}" />
+        <StackPanel Spacing="2">
+            <TextBlock x:Name="StatusText" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}" />
+            <TextBlock x:Name="SimText" IsTextSelectionEnabled="True" Style="{StaticResource CaptionTextBlockStyle}" />
+        </StackPanel>
         <PasswordBox x:Name="PasswordInput" Header="Пароль от админки роутера" />
         <NumberBox
             x:Name="LimitInput"

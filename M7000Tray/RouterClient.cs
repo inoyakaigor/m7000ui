@@ -7,7 +7,7 @@ namespace M7000Tray;
 public record Sms(string From, string ReceivedTime, string Content);
 
 /// <summary>RouterTotalBytes — счётчик роутера за его расчётный период (обнуляется в день оплаты).</summary>
-public record RouterSnapshot(double RouterTotalBytes, IReadOnlyList<Sms> LatestSms);
+public record RouterSnapshot(double RouterTotalBytes, string? SimNumber, IReadOnlyList<Sms> LatestSms);
 
 /// <summary>Роутер отклонил пароль. Повторять нельзя: после 10 неудач вход блокируется на 2 часа.</summary>
 public sealed class LoginRejectedException() : Exception("Роутер отклонил пароль");
@@ -44,7 +44,9 @@ public static class RouterClient
                 m.GetProperty("content").GetString() ?? "")).ToList()
             : [];
 
-        return new RouterSnapshot(used, list);
+        string? sim = status.RootElement.TryGetProperty("deviceInfo", out var di) && di.TryGetProperty("simNumber", out var sn) ? sn.GetString() : null;
+
+        return new RouterSnapshot(used, sim, list);
     }
 
     // Ответ с result != 0 (например -3 — нет сессии) превращаем в понятную ошибку, а не KeyNotFound дальше.
@@ -52,7 +54,13 @@ public static class RouterClient
     {
         JsonDocument doc;
         try { doc = JsonDocument.Parse(body); }
-        catch (JsonException) { throw new Exception($"Не удалось прочитать ответ {what}"); }
+        catch (JsonException)
+        {
+            // Сбой плавающий — сохраняем сырой ответ, чтобы было что разбирать.
+            Settings.LogCrash($"Не JSON в ответе {what} (длина {body.Length}): {(body.Length > 500 ? body[..500] : body)}");
+            string head = body.Length > 40 ? body[..40] : body;
+            throw new Exception($"Не удалось прочитать ответ {what}: {head}");
+        }
         if (doc.RootElement.TryGetProperty("result", out var r) && r.ValueKind == JsonValueKind.Number && r.GetInt32() != 0)
         {
             int code = r.GetInt32();
