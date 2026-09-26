@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="M7000Tray.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="M7000">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <StackPanel Padding="20" Spacing="14">
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}" />
+        <PasswordBox x:Name="PasswordInput" Header="Пароль от админки роутера" />
+        <NumberBox
+            x:Name="LimitInput"
+            Header="Лимит пакета, ГБ"
+            Minimum="0.1"
+            SmallChange="1"
+            SpinButtonPlacementMode="Compact" />
+        <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <NumberBox
+                x:Name="RemainingInput"
+                Header="Осталось сейчас, ГБ"
+                Minimum="0" />
+            <Button
+                Grid.Column="1"
+                VerticalAlignment="Bottom"
+                Click="Renew_Click"
+                Content="Пакет продлён"
+                ToolTipService.ToolTip="Осталось = лимит пакета" />
+        </Grid>
+        <CheckBox x:Name="AutoStartInput" Content="Запускать вместе с Windows" />
+        <Button
+            HorizontalAlignment="Right"
+            Click="Save_Click"
+            Content="Сохранить"
+            Style="{StaticResource AccentButtonStyle}" />
+    </StackPanel>
+</Window>

@@ -1,0 +1,8 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Project Path="M7000Lib/M7000Lib.csproj" />
+  <Project Path="M7000Tray/M7000Tray.csproj" />
+</Solution>
