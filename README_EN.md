@@ -96,6 +96,10 @@ Settings are stored in `settings.json` (path determined via `Settings.Load()`).
 | Settings window won't open | Check that WebView2 runtime is installed |
 | Router connection error | Check IP and password in settings; the router must be on the same network |
 
+## Acknowledgements
+
+Big thanks to @vpaeder for his work on [TP-Link M7350 C++](https://github.com/vpaeder/tplink_m7350_cpp) project! Without it, I'd never have finished decoding TP-Link's protocol. Even with AI.
+
 ## License
 
-Internal project.
+GPLv3
