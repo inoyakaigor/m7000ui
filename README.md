@@ -1,3 +1,5 @@
+[English version](README_EN.md) | [Версия на русском](README.md)
+
 # M7000 UI
 <img src="./M7000Tray/Assets/app.png">
 
@@ -18,15 +20,20 @@
 
 ```
 M7000 UI/
-├── M7000UI.slnx          # Решение (x64, ARM64)
+├── M7000 UI.slnx         # Решение (x64, ARM64)
 ├── M7000Lib/             # Библиотека: протокол TP-Link, работа с роутером
 │   ├── TPLinkProtocol.cs
 │   └── TPLinkModules.cs
 └── M7000Tray/            # TUI: системный трей, настройки, уведомления
     ├── App.xaml / App.xaml.cs
-    ├── SettingsWindow.xaml
+    ├── SettingsWindow.xaml / SettingsWindow.xaml.cs
+    ├── RouterClient.cs
+    ├── Settings.cs
     ├── TrayIconRenderer.cs
-    └── Program.cs
+    └── Assets/
+        ├── app.png
+        ├── envelope.png
+        └── M7000.ico
 ```
 
 ## Сборка
