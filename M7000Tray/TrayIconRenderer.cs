@@ -42,10 +42,17 @@ public static partial class TrayIconRenderer
 
             string text = percent is { } v ? ((int)Math.Floor(Math.Clamp(v, 0, 100))).ToString() : "?";
             float fontPx = size * (text.Length >= 3 ? 0.46f : 0.62f);
-            using var font = new Font(text.Length >= 3 ? "Segoe UI Semibold" : "Segoe UI", fontPx, text.Length >= 3 ? FontStyle.Regular : FontStyle.Bold, GraphicsUnit.Pixel);
+            using var family = new FontFamily(text.Length >= 3 ? "Segoe UI Semibold" : "Segoe UI");
             using var brush = new SolidBrush(IsTaskbarLight() ? Color.Black : Color.White);
-            using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            g.DrawString(text, font, brush, new RectangleF(0, 0, size, size + 1), sf);
+
+            // Центрируем по реальным контурам цифр, а не по метрикам строки (там запас под выносные элементы — цифры уезжали).
+            using var path = new GraphicsPath();
+            path.AddString(text, family, (int)(text.Length >= 3 ? FontStyle.Regular : FontStyle.Bold), fontPx, PointF.Empty, StringFormat.GenericTypographic);
+            var b = path.GetBounds();
+            using var shift = new Matrix();
+            shift.Translate(size / 2f - (b.X + b.Width / 2), size / 2f - (b.Y + b.Height / 2));
+            path.Transform(shift);
+            g.FillPath(brush, path);
         }
 
         // Icon.FromHandle не владеет HICON: клонируем в самостоятельную иконку и сразу освобождаем исходный.
