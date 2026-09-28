@@ -65,7 +65,12 @@ public partial class App : Application
         menu.Items.Add(MenuItem("Выход", Quit));
 
         var click = new XamlUICommand();
-        click.ExecuteRequested += (_, _) => Process.Start(new ProcessStartInfo(RouterClient.RouterUrl + "login.html") { UseShellExecute = true });
+        click.ExecuteRequested += (_, _) =>
+        {
+            // Роутер держит одну сессию: наш опрос раз в минуту выкидывает из админки. Даём 5 минут поработать.
+            Pause(5);
+            Process.Start(new ProcessStartInfo(RouterClient.RouterUrl + "login.html") { UseShellExecute = true });
+        };
 
         _tray = new TaskbarIcon
         {
@@ -209,7 +214,8 @@ public partial class App : Application
 
     void Pause(int minutes)
     {
-        _pausedUntil = DateTime.Now.AddMinutes(minutes);
+        var until = DateTime.Now.AddMinutes(minutes);
+        if (until > _pausedUntil) _pausedUntil = until; // не укорачиваем уже поставленную паузу
         UpdateTray(_percentLeft, _warning);
     }
 

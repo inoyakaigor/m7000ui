@@ -79,7 +79,7 @@ dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64 
      3. the remaining percent.
    - A gray ring with "?" means no data yet. A yellow triangle means an error; the tooltip shows the reason.
 4. **Mouse.**
-   - Left click opens the router admin page `http://192.168.0.1/login.html`.
+   - Left click opens the router admin page `http://192.168.0.1/login.html` and pauses polling for 5 minutes — otherwise the app poll would log you out of the admin page.
    - Right click opens the menu: «Настройки» (settings), «Обновить» (refresh), «Не обновлять» (pause for 5/10/20 minutes), «Выход» (exit).
 5. **New SMS** — a Windows notification with the text and a «Пометить прочитанным» (mark as read) button. The button also works when the app is closed: Windows starts it.
 6. **Wrong password.** Polling stops until the password is saved again. After 10 failed logins the router blocks login for 2 hours, so the app does not retry.
