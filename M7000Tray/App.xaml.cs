@@ -26,6 +26,7 @@ public partial class App : Application
     RouterSnapshot? _lastSnap;
     double? _percentLeft; // последний известный остаток, %
     bool _warning;
+    DateTime _pausedUntil; // «Не обновлять N минут» из меню трея
 
     public App()
     {
@@ -51,7 +52,11 @@ public partial class App : Application
 
         var menu = new MenuFlyout();
         menu.Items.Add(MenuItem("Настройки", OpenSettings));
-        menu.Items.Add(MenuItem("Обновить", () => _ = PollAsync()));
+        menu.Items.Add(MenuItem("Обновить", Resume)); // ручное обновление заодно снимает паузу
+        var pause = new MenuFlyoutSubItem { Text = "Не обновлять" };
+        foreach (int minutes in (int[])[5, 10, 20])
+            pause.Items.Add(MenuItem($"{minutes} минут", () => Pause(minutes)));
+        menu.Items.Add(pause);
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Выход", Quit));
 
@@ -86,7 +91,7 @@ public partial class App : Application
 
     async Task PollAsync()
     {
-        if (_polling) return;
+        if (_polling || DateTime.Now < _pausedUntil) return;
         // Ручная правка ini: подхватываем, а не затираем следующим Save(). Новый пароль — снова пробуем войти.
         if (_settings.ReloadIfChanged()) { _loginRejected = false; _settings.ApplyAutoStart(); }
         if (_loginRejected) return;
@@ -165,11 +170,24 @@ public partial class App : Application
             : TrayIconRenderer.Render(percentLeft);
         _tray.Icon = _currentIcon;
         old?.Dispose();
-        _tray.ToolTipText = _status.Length > 120 ? _status[..120] : _status;
+        string tip = DateTime.Now < _pausedUntil ? $"{_status}\nОпрос приостановлен до {_pausedUntil:HH:mm}" : _status;
+        _tray.ToolTipText = tip.Length > 120 ? tip[..120] : tip;
 
         if (percentLeft is not null) _percentLeft = percentLeft;
         _warning = warning;
         _settingsWindow?.Refresh(_status, _percentLeft, _warning, _lastSnap);
+    }
+
+    void Pause(int minutes)
+    {
+        _pausedUntil = DateTime.Now.AddMinutes(minutes);
+        UpdateTray(_percentLeft, _warning);
+    }
+
+    void Resume()
+    {
+        _pausedUntil = default;
+        _ = PollAsync();
     }
 
     void OpenSettings()
