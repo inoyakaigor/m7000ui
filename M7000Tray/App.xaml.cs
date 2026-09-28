@@ -84,7 +84,10 @@ public partial class App : Application
 
     async Task PollAsync()
     {
-        if (_polling || _loginRejected) return;
+        if (_polling) return;
+        // Ручная правка ini: подхватываем, а не затираем следующим Save(). Новый пароль — снова пробуем войти.
+        if (_settings.ReloadIfChanged()) { _loginRejected = false; _settings.ApplyAutoStart(); }
+        if (_loginRejected) return;
         if (string.IsNullOrEmpty(_settings.PasswordProtected))
         {
             _status = "Укажите пароль от админки роутера";

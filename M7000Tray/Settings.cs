@@ -27,6 +27,9 @@ public sealed class Settings
     static readonly string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Igor Zviagintsev", "M7000");
     static readonly string FilePath = Path.Combine(Dir, "settings.ini");
 
+    // Время записи файла, который отражает этот объект. Новее — значит, ini поправили руками.
+    DateTime _fileTime;
+
     public string Password
     {
         get => PasswordProtected is null ? "" :
@@ -58,6 +61,7 @@ public sealed class Settings
     {
         var s = new Settings();
         if (!File.Exists(FilePath)) return s;
+        s._fileTime = File.GetLastWriteTimeUtc(FilePath);
 
         // Плоский ini: key=value, секции и комментарии (; #) игнорируются.
         foreach (var line in File.ReadAllLines(FilePath))
@@ -78,6 +82,21 @@ public sealed class Settings
         return s;
     }
 
+    /// <summary>Перечитывает ini, если его изменили снаружи. Объект остаётся тем же — на него ссылаются App и окно.</summary>
+    public bool ReloadIfChanged()
+    {
+        if (!File.Exists(FilePath) || File.GetLastWriteTimeUtc(FilePath) == _fileTime) return false;
+        var f = Load();
+        PasswordProtected = f.PasswordProtected;
+        LimitGb = f.LimitGb;
+        LastSmsTime = f.LastSmsTime;
+        AutoStart = f.AutoStart;
+        UsedBytes = f.UsedBytes;
+        LastRouterTotal = f.LastRouterTotal;
+        _fileTime = f._fileTime;
+        return true;
+    }
+
     public void Save()
     {
         Directory.CreateDirectory(Dir);
@@ -91,5 +110,6 @@ public sealed class Settings
             $"{nameof(UsedBytes)}={UsedBytes.ToString("R", CultureInfo.InvariantCulture)}",
             $"{nameof(LastRouterTotal)}={LastRouterTotal?.ToString("R", CultureInfo.InvariantCulture)}",
         ]);
+        _fileTime = File.GetLastWriteTimeUtc(FilePath);
     }
 }
