@@ -24,7 +24,11 @@
 				FontSize="50px"
 				Glyph="&#xE860;" />
 
-			<Grid Grid.Column="2" VerticalAlignment="Bottom">
+			<Grid
+				x:Name="SignalGroup"
+				Grid.Column="2"
+				VerticalAlignment="Bottom"
+				Background="Transparent">
 				<FontIcon
 					x:Name="SignalStatus"
 					VerticalAlignment="Bottom"

@@ -8,7 +8,8 @@ public record Sms(string From, string ReceivedTime, string Content);
 
 /// <summary>RouterTotalBytes — счётчик роутера за его расчётный период (обнуляется в день оплаты).</summary>
 public record RouterSnapshot(double RouterTotalBytes, string? SimNumber, IReadOnlyList<Sms> LatestSms,
-    int? BatteryPercent, bool Charging, int? SignalLevel, bool Roaming, bool Lte);
+    int? BatteryPercent, bool Charging, int? SignalLevel, bool Roaming, bool Lte,
+    double? Rsrp, double? Rsrq, double? Snr);
 
 /// <summary>Роутер отклонил пароль. Повторять нельзя: после 10 неудач вход блокируется на 2 часа.</summary>
 public sealed class LoginRejectedException() : Exception("Роутер отклонил пароль");
@@ -61,7 +62,11 @@ public static class RouterClient
 
         bool lte = networkType == 3; // login.min.js: lte: 3
 
-        return new RouterSnapshot(used, sim, list, battery, charging, signal, roaming, lte);
+        double? Num(string name) => wan.TryGetProperty(name, out var e) && e.TryGetDouble(out var d) ? d : null;
+        // ponytail: snr приходит как 40/80 — считаем, что это десятые доли dB (в прошивке масштаб не нашли). Сверить с админкой.
+        double? snr = Num("snr") / 10;
+
+        return new RouterSnapshot(used, sim, list, battery, charging, signal, roaming, lte, Num("rsrp"), Num("rsrq"), snr);
     }
 
     // Ответ с result != 0 (например -3 — нет сессии) превращаем в понятную ошибку, а не KeyNotFound дальше.

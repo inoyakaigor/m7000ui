@@ -76,16 +76,31 @@ public sealed partial class SettingsWindow : Window
         }
 
         if (snap?.BatteryPercent is { } battery)
+        {
             BatteryLevel.Glyph = Glyphs.Battery(battery, snap.Charging);
+            ToolTipService.SetToolTip(BatteryLevel, new ToolTip { Content = $"Заряд {battery}%, {(snap.Charging ? "заряжается" : "не заряжается")}" });
+        }
         if (snap is not null)
         {
             SignalStatus.Glyph = Glyphs.Signal(snap.SignalLevel);
             RoamingIcon.Visibility = snap.Roaming ? Visibility.Visible : Visibility.Collapsed;
             NetworkIcon.Visibility = snap.Lte ? Visibility.Visible : Visibility.Collapsed;
+            // На всю группу: значки 4G и роуминга перекрывают полоски сигнала.
+            ToolTipService.SetToolTip(SignalGroup, new ToolTip { Content = SignalTip(snap) });
         }
 
         if (ReadNumber(LimitInput) == _shownLimit) LimitInput.Value = _shownLimit = _settings.LimitGb;
         if (ReadNumber(RemainingInput) == _shownRemaining) RemainingInput.Value = _shownRemaining = CurrentRemainingGb();
+    }
+
+    static string SignalTip(RouterSnapshot s)
+    {
+        if (s.SignalLevel is not { } level) return "Нет сети";
+        string F(double? v, string unit) => v is { } d ? $"{d:0.00} {unit}" : "—";
+        string tip = $"Уровень {level}/4 · RSRP {F(s.Rsrp, "dBm")} · RSRQ {F(s.Rsrq, "dB")} · SNR {F(s.Snr, "dB")}";
+        if (s.Lte) tip += " · 4G";
+        if (s.Roaming) tip += " · роуминг";
+        return tip;
     }
 
     // Value и Text у NumberBox обновляются только по Enter/потере фокуса — читаем то, что сейчас набрано во внутреннем TextBox.

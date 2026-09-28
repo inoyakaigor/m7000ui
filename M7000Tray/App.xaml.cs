@@ -131,6 +131,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             _status = $"Ошибка: {ex.Message}";
+            Settings.LogCrash(ex); // в подсказке только текст, стек — в crash.log
             UpdateTray(null, warning: true);
         }
         finally { _polling = false; }
