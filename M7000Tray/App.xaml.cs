@@ -23,7 +23,9 @@ public partial class App : Application
     bool _polling;
     bool _loginRejected; // не долбим роутер неверным паролем, пока пользователь не сохранит новый
     string _status = "Загрузка…";
-    string? _simNumber;
+    RouterSnapshot? _lastSnap;
+    double? _percentLeft; // последний известный остаток, %
+    bool _warning;
 
     public App()
     {
@@ -99,7 +101,7 @@ public partial class App : Application
         try
         {
             var snap = await Task.Run(() => RouterClient.PollAsync(_settings.Password));
-            _simNumber = snap.SimNumber;
+            _lastSnap = snap;
 
             _settings.UsedBytes += Settings.RouterDelta(_settings.LastRouterTotal, snap.RouterTotalBytes);
             _settings.LastRouterTotal = snap.RouterTotalBytes;
@@ -164,12 +166,17 @@ public partial class App : Application
         _tray.Icon = _currentIcon;
         old?.Dispose();
         _tray.ToolTipText = _status.Length > 120 ? _status[..120] : _status;
+
+        if (percentLeft is not null) _percentLeft = percentLeft;
+        _warning = warning;
+        _settingsWindow?.Refresh(_status, _percentLeft, _warning, _lastSnap);
     }
 
     void OpenSettings()
     {
         if (_settingsWindow is not null) { _settingsWindow.Activate(); return; }
-        _settingsWindow = new SettingsWindow(_settings, _status, _simNumber, () => { _loginRejected = false; ShowTraffic(); _ = PollAsync(); });
+        _settingsWindow = new SettingsWindow(_settings, () => { _loginRejected = false; ShowTraffic(); _ = PollAsync(); });
+        _settingsWindow.Refresh(_status, _percentLeft, _warning, _lastSnap);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Activate();
     }

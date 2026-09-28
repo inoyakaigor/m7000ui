@@ -1,5 +1,8 @@
+using System.Globalization;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace M7000Tray;
 
@@ -7,20 +10,18 @@ public sealed partial class SettingsWindow : Window
 {
     readonly Settings _settings;
     readonly Action _onSaved;
-    readonly double _shownLimit, _shownRemaining;
+    // Что окно само подставило в поля. Отличается от введённого — значит, пользователь правил, и опрос поле не трогает.
+    double _shownLimit, _shownRemaining;
 
-    public SettingsWindow(Settings settings, string status, string? simNumber, Action onSaved)
+    public SettingsWindow(Settings settings, Action onSaved)
     {
         InitializeComponent();
         _settings = settings;
         _onSaved = onSaved;
 
-        StatusText.Text = status;
-        SimText.Text = string.IsNullOrEmpty(simNumber) ? "Номер SIM: —" : simNumber;
         PasswordInput.Password = settings.Password;
         LimitInput.Value = _shownLimit = settings.LimitGb;
-        _shownRemaining = Math.Round(Math.Max(0, settings.LimitGb - settings.UsedBytes / Settings.BytesPerGb), 2);
-        RemainingInput.Value = _shownRemaining;
+        RemainingInput.Value = _shownRemaining = CurrentRemainingGb();
         AutoStartInput.IsChecked = settings.AutoStart;
 
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "M7000.ico"));
@@ -57,13 +58,53 @@ public sealed partial class SettingsWindow : Window
             ? Microsoft.UI.Xaml.Controls.PasswordRevealMode.Visible
             : Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
 
-    void Renew_Click(object sender, RoutedEventArgs e) => RemainingInput.Value = LimitInput.Value;
+    double CurrentRemainingGb() => Math.Round(Math.Max(0, _settings.LimitGb - _settings.UsedBytes / Settings.BytesPerGb), 2);
+
+    /// <summary>Свежие данные после опроса/сохранения. percentLeft == null — данных ещё не было.</summary>
+    public void Refresh(string status, double? percentLeft, bool error, RouterSnapshot? snap)
+    {
+        StatusText.Text = status;
+        SimText.Text = string.IsNullOrEmpty(snap?.SimNumber) ? "Номер SIM: —" : snap.SimNumber;
+
+        StatusBar.IsIndeterminate = percentLeft is null && !error;
+        StatusBar.ShowError = error;
+        if (percentLeft is { } p)
+        {
+            StatusBar.Value = p;
+            var c = TrayIconRenderer.ColorFor(p);
+            StatusBar.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(c.A, c.R, c.G, c.B));
+        }
+
+        if (ReadNumber(LimitInput) == _shownLimit) LimitInput.Value = _shownLimit = _settings.LimitGb;
+        if (ReadNumber(RemainingInput) == _shownRemaining) RemainingInput.Value = _shownRemaining = CurrentRemainingGb();
+    }
+
+    // Value и Text у NumberBox обновляются только по Enter/потере фокуса — читаем то, что сейчас набрано во внутреннем TextBox.
+    static double ReadNumber(NumberBox box)
+    {
+        string text = FindTextBox(box)?.Text ?? box.Text;
+        return double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out var v) ? v : box.Value;
+    }
+
+    static TextBox? FindTextBox(DependencyObject parent)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is TextBox tb) return tb;
+            if (FindTextBox(child) is { } found) return found;
+        }
+        return null;
+    }
+
+    void Renew_Click(object sender, RoutedEventArgs e) => RemainingInput.Value = ReadNumber(LimitInput);
 
     void Save_Click(object sender, RoutedEventArgs e)
     {
         _settings.Password = PasswordInput.Password;
-        double limit = !double.IsNaN(LimitInput.Value) && LimitInput.Value > 0 ? LimitInput.Value : _shownLimit;
-        double remaining = double.IsNaN(RemainingInput.Value) ? _shownRemaining : RemainingInput.Value;
+        double limitIn = ReadNumber(LimitInput), remainingIn = ReadNumber(RemainingInput);
+        double limit = !double.IsNaN(limitIn) && limitIn > 0 ? limitIn : _shownLimit;
+        double remaining = double.IsNaN(remainingIn) || remainingIn < 0 ? _shownRemaining : remainingIn;
         // Трогаем счётчик, только если пользователь что-то поменял, — иначе не теряем трафик, набежавший пока окно открыто.
         if (limit != _shownLimit || remaining != _shownRemaining)
             _settings.UsedBytes = Math.Max(0, limit - remaining) * Settings.BytesPerGb;
