@@ -14,6 +14,9 @@ public record RouterSnapshot(double RouterTotalBytes, string? SimNumber, IReadOn
 /// <summary>Роутер отклонил пароль. Повторять нельзя: после 10 неудач вход блокируется на 2 часа.</summary>
 public sealed class LoginRejectedException() : Exception("Роутер отклонил пароль");
 
+/// <summary>Ответ роутера не разобрался как JSON — обычно расшифровался в мусор. Помогает новая сессия.</summary>
+public sealed class BadResponseException(string message) : Exception(message);
+
 public static class RouterClient
 {
     public const string RouterUrl = "http://192.168.0.1/";
@@ -56,7 +59,12 @@ public static class RouterClient
     public static async Task<RouterSnapshot> PollAsync(string password)
     {
         await Gate.WaitAsync();
-        try { return await PollLockedAsync(password); }
+        try
+        {
+            try { return await PollLockedAsync(password); }
+            // Изредка ответ на запрос SMS расшифровывается в мусор (сырой ответ — в crash.log). Одна повторная попытка в новой сессии.
+            catch (BadResponseException) { return await PollLockedAsync(password); }
+        }
         finally { Gate.Release(); }
     }
 
@@ -113,7 +121,7 @@ public static class RouterClient
             // Сбой плавающий — сохраняем сырой ответ, чтобы было что разбирать.
             Settings.LogCrash($"Не JSON в ответе {what} (длина {body.Length}): {(body.Length > 500 ? body[..500] : body)}");
             string head = body.Length > 40 ? body[..40] : body;
-            throw new Exception($"Не удалось прочитать ответ {what}: {head}");
+            throw new BadResponseException($"Не удалось прочитать ответ {what}: {head}");
         }
         if (doc.RootElement.TryGetProperty("result", out var r) && r.ValueKind == JsonValueKind.Number && r.GetInt32() != 0)
         {
