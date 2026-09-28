@@ -12,4 +12,8 @@ public static class Glyphs
             ? char.ConvertFromUtf32(0xE85A + percent * 9 / 100)  // 9 ступеней
             : char.ConvertFromUtf32(0xE850 + percent / 10);      // 10 ступеней
     }
+
+    /// <summary>level — signalStrength роутера 0…4: E86C (минимум) … E870 (полный). null — нет сети: E871.</summary>
+    public static string Signal(int? level) =>
+        level is { } l ? char.ConvertFromUtf32(0xE86C + Math.Clamp(l, 0, 4)) : "\uE871";
 }

@@ -32,6 +32,7 @@
 					FontSize="50px"
 					Glyph="&#xE86E;" />
 				<FontIcon
+					x:Name="RoamingIcon"
 					HorizontalAlignment="Right"
 					VerticalAlignment="Bottom"
 					FontFamily="Segoe Fluent Icons"

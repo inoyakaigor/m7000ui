@@ -77,6 +77,11 @@ public sealed partial class SettingsWindow : Window
 
         if (snap?.BatteryPercent is { } battery)
             BatteryLevel.Glyph = Glyphs.Battery(battery, snap.Charging);
+        if (snap is not null)
+        {
+            SignalStatus.Glyph = Glyphs.Signal(snap.SignalLevel);
+            RoamingIcon.Visibility = snap.Roaming ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         if (ReadNumber(LimitInput) == _shownLimit) LimitInput.Value = _shownLimit = _settings.LimitGb;
         if (ReadNumber(RemainingInput) == _shownRemaining) RemainingInput.Value = _shownRemaining = CurrentRemainingGb();
