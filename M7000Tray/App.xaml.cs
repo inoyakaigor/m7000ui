@@ -54,7 +54,7 @@ public partial class App : Application
         menu.Items.Add(MenuItem("Выход", Quit));
 
         var click = new XamlUICommand();
-        click.ExecuteRequested += (_, _) => OpenSettings();
+        click.ExecuteRequested += (_, _) => Process.Start(new ProcessStartInfo(RouterClient.RouterUrl + "login.html") { UseShellExecute = true });
 
         _tray = new TaskbarIcon
         {

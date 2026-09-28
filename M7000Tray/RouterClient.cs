@@ -14,7 +14,7 @@ public sealed class LoginRejectedException() : Exception("Роутер откл�
 
 public static class RouterClient
 {
-    const string RouterUrl = "http://192.168.0.1/";
+    public const string RouterUrl = "http://192.168.0.1/";
 
     // ponytail: новая сессия (handshake + login) на каждый опрос — раз в минуту это дёшево
     // и не нужно ловить протухание сессии. Если роутер начнёт выкидывать веб-админку — держать сессию.
