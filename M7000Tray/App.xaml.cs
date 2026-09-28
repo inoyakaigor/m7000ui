@@ -49,7 +49,9 @@ public partial class App : Application
 
         _settings.ApplyAutoStart();
 
-        AppNotificationManager.Default.NotificationInvoked += (_, _) => { };
+        // Кнопка «Пометить прочитанным»: событие приходит не в UI-потоке.
+        var ui = DispatcherQueue.GetForCurrentThread();
+        AppNotificationManager.Default.NotificationInvoked += (sender, e) => ui.TryEnqueue(() => _ = HandleNotificationAsync(e.Arguments));
         AppNotificationManager.Default.Register("M7000", AppIconUri); // иконка приложения в заголовке, конверт — в самом уведомлении
 
         var menu = new MenuFlyout();
@@ -74,6 +76,10 @@ public partial class App : Application
         };
         UpdateTray(null);
         _tray.ForceCreate(enablesEfficiencyMode: false);
+
+        // Приложение было закрыто, а кнопку нажали в центре уведомлений — Windows запустила нас ради неё.
+        if (Microsoft.Windows.AppLifecycle.AppInstance.GetCurrent().GetActivatedEventArgs() is { Kind: Microsoft.Windows.AppLifecycle.ExtendedActivationKind.AppNotification } activation)
+            _ = HandleNotificationAsync(((AppNotificationActivatedEventArgs)activation.Data).Arguments);
 
         _timer = DispatcherQueue.GetForCurrentThread().CreateTimer();
         _timer.Interval = TimeSpan.FromMinutes(1);
@@ -158,9 +164,27 @@ public partial class App : Application
         var toast = new AppNotificationBuilder()
             .SetAppLogoOverride(EnvelopeUri)
             .AddText($"Новое сообщение от {sms.From}")
-            .AddText(sms.Content)
-            .BuildNotification();
-        AppNotificationManager.Default.Show(toast);
+            .AddText(sms.Content);
+        if (sms.Index >= 0)
+            toast.AddButton(new AppNotificationButton("Пометить прочитанным").AddArgument("markRead", sms.Index.ToString()));
+        AppNotificationManager.Default.Show(toast.BuildNotification());
+    }
+
+    async Task HandleNotificationAsync(IDictionary<string, string> args)
+    {
+        if (!args.TryGetValue("markRead", out var raw) || !int.TryParse(raw, out int index)) return;
+        if (string.IsNullOrEmpty(_settings.PasswordProtected) || _loginRejected) return;
+        try
+        {
+            await Task.Run(() => RouterClient.MarkReadAsync(_settings.Password, index));
+            await PollAsync(); // обновить конверт в трее
+        }
+        catch (Exception ex)
+        {
+            Settings.LogCrash(ex);
+            _status = $"Не удалось пометить SMS прочитанным: {ex.Message}";
+            UpdateTray(_percentLeft, warning: true);
+        }
     }
 
     void UpdateTray(double? percentLeft, bool warning = false)
