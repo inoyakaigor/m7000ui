@@ -26,7 +26,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\M7000Lib\M7000Lib.csproj" />
-    <Content Include="Assets\envelope.png;Assets\M7000.ico;Assets\app.png"
+    <Content Include="Assets\envelope.png;Assets\M7000.ico;Assets\app-plate.png"
       CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

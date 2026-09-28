@@ -12,7 +12,9 @@ namespace M7000Tray;
 public partial class App : Application
 {
     static readonly Uri EnvelopeUri = new(Path.Combine(AppContext.BaseDirectory, "Assets", "envelope.png"));
-    static readonly Uri AppIconUri = new(Path.Combine(AppContext.BaseDirectory, "Assets", "app.png"));
+    static readonly Uri AppIconUri = new(Path.Combine(AppContext.BaseDirectory, "Assets", "app-plate.png"));
+    // Windows в тёмной теме инвертирует тёмные иконки в заголовке уведомления (роутер становился негативом).
+    // На светлой подложке иконка считается светлой и выводится как есть.
 
     readonly Settings _settings = Settings.Load();
     Mutex? _singleInstance;
