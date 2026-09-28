@@ -9,7 +9,7 @@ public record Sms(string From, string ReceivedTime, string Content);
 /// <summary>RouterTotalBytes — счётчик роутера за его расчётный период (обнуляется в день оплаты).</summary>
 public record RouterSnapshot(double RouterTotalBytes, string? SimNumber, IReadOnlyList<Sms> LatestSms,
     int? BatteryPercent, bool Charging, int? SignalLevel, bool Roaming, bool Lte,
-    double? Rsrp, double? Rsrq, double? Snr);
+    double? Rsrp, double? Rsrq, double? Snr, int UnreadSms);
 
 /// <summary>Роутер отклонил пароль. Повторять нельзя: после 10 неудач вход блокируется на 2 часа.</summary>
 public sealed class LoginRejectedException() : Exception("Роутер отклонил пароль");
@@ -66,7 +66,8 @@ public static class RouterClient
         // ponytail: snr приходит как 40/80 — считаем, что это десятые доли dB (в прошивке масштаб не нашли). Сверить с админкой.
         double? snr = Num("snr") / 10;
 
-        return new RouterSnapshot(used, sim, list, battery, charging, signal, roaming, lte, Num("rsrp"), Num("rsrq"), snr);
+        return new RouterSnapshot(used, sim, list, battery, charging, signal, roaming, lte, Num("rsrp"), Num("rsrq"), snr,
+            root.TryGetProperty("message", out var msg) && msg.TryGetProperty("unreadMessages", out var um) && um.TryGetInt32(out var u) ? u : 0);
     }
 
     // Ответ с result != 0 (например -3 — нет сессии) превращаем в понятную ошибку, а не KeyNotFound дальше.

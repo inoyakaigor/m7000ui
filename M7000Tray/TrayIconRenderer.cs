@@ -6,8 +6,16 @@ using Microsoft.Win32;
 
 namespace M7000Tray;
 
+/// <summary>Что рисовать внутри кольца. Порядок — приоритет: LowBattery важнее Envelope, Envelope важнее Percent.</summary>
+public enum TrayBadge { Percent, Envelope, LowBattery }
+
 public static partial class TrayIconRenderer
 {
+    public static readonly Color Gold = Color.FromArgb(0xD2, 0xB0, 0x01); // как значок роуминга в окне настроек
+
+    public static TrayBadge ChooseBadge(int? batteryPercent, int unreadSms) =>
+        batteryPercent < 10 ? TrayBadge.LowBattery : unreadSms > 0 ? TrayBadge.Envelope : TrayBadge.Percent;
+
     public static Color ColorFor(double percent) => percent switch
     {
         >= 90 => Color.FromArgb(0x00, 0xBF, 0xFF), // небесно-голубой
@@ -17,7 +25,7 @@ public static partial class TrayIconRenderer
     };
 
     /// <summary>percent = остаток трафика 0..100; null — данных ещё нет, идёт загрузка (серое кольцо и «?»).</summary>
-    public static Icon Render(double? percent)
+    public static Icon Render(double? percent, TrayBadge badge = TrayBadge.Percent, int batteryPercent = 0, bool charging = false)
     {
         int size = 16 * (int)GetDpiForSystem() / 96;
         using var bmp = new Bitmap(size, size);
@@ -40,19 +48,39 @@ public static partial class TrayIconRenderer
                 g.DrawEllipse(pen, rect);
             }
 
-            string text = percent is { } v ? ((int)Math.Floor(Math.Clamp(v, 0, 100))).ToString() : "?";
-            float fontPx = size * (text.Length >= 3 ? 0.46f : 0.62f);
-            using var family = new FontFamily(text.Length >= 3 ? "Segoe UI Semibold" : "Segoe UI");
-            using var brush = new SolidBrush(IsTaskbarLight() ? Color.Black : Color.White);
+            string text; string fontName; FontStyle style; float fontPx; Color color;
+            switch (badge)
+            {
+                case TrayBadge.LowBattery:
+                    (text, fontName, style, fontPx, color) = (Glyphs.Battery(batteryPercent, charging), "Segoe Fluent Icons", FontStyle.Regular, size * 0.62f, ColorFor(0));
+                    break;
+                case TrayBadge.Envelope:
+                    (text, fontName, style, fontPx, color) = ("\uE715", "Segoe Fluent Icons", FontStyle.Regular, size * 0.6f, Gold); // закрытый конверт
+                    break;
+                default:
+                    text = percent is { } v ? ((int)Math.Floor(Math.Clamp(v, 0, 100))).ToString() : "?";
+                    bool three = text.Length >= 3;
+                    (fontName, style, fontPx) = (three ? "Segoe UI Semibold" : "Segoe UI", three ? FontStyle.Regular : FontStyle.Bold, size * (three ? 0.46f : 0.62f));
+                    color = IsTaskbarLight() ? Color.Black : Color.White;
+                    break;
+            }
+            using var family = new FontFamily(fontName);
+            using var brush = new SolidBrush(color);
 
-            // Центрируем по реальным контурам цифр, а не по метрикам строки (там запас под выносные элементы — цифры уезжали).
+            // Центрируем по реальным контурам, а не по метрикам строки (там запас под выносные элементы — цифры уезжали).
             using var path = new GraphicsPath();
-            path.AddString(text, family, (int)(text.Length >= 3 ? FontStyle.Regular : FontStyle.Bold), fontPx, PointF.Empty, StringFormat.GenericTypographic);
+            path.AddString(text, family, (int)style, fontPx, PointF.Empty, StringFormat.GenericTypographic);
             var b = path.GetBounds();
             using var shift = new Matrix();
             shift.Translate(size / 2f - (b.X + b.Width / 2), size / 2f - (b.Y + b.Height / 2));
             path.Transform(shift);
             g.FillPath(brush, path);
+            // Глифы Fluent — тонкий контур, в 16–32 px он бледнеет. Обводим тем же цветом для толщины.
+            if (badge != TrayBadge.Percent)
+            {
+                using var pen = new Pen(color, Math.Max(1f, size / 20f)) { LineJoin = LineJoin.Round };
+                g.DrawPath(pen, path);
+            }
         }
 
         // Icon.FromHandle не владеет HICON: клонируем в самостоятельную иконку и сразу освобождаем исходный.

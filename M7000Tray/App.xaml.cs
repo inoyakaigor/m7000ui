@@ -170,7 +170,9 @@ public partial class App : Application
         // warning — стандартный жёлтый треугольник Windows (SIID_WARNING), нужного для трея размера.
         _currentIcon = warning
             ? System.Drawing.SystemIcons.GetStockIcon(System.Drawing.StockIconId.Warning, System.Drawing.StockIconOptions.SmallIcon)
-            : TrayIconRenderer.Render(percentLeft);
+            : TrayIconRenderer.Render(percentLeft,
+                TrayIconRenderer.ChooseBadge(_lastSnap?.BatteryPercent, _lastSnap?.UnreadSms ?? 0),
+                _lastSnap?.BatteryPercent ?? 0, _lastSnap?.Charging ?? false);
         _tray.Icon = _currentIcon;
         old?.Dispose();
         string tip = DateTime.Now < _pausedUntil ? $"{_status}\nОпрос приостановлен до {_pausedUntil:HH:mm}" : _status;
@@ -227,6 +229,11 @@ public partial class App : Application
         Debug.Assert(Glyphs.Battery(0, true) == "\uE85A" && Glyphs.Battery(99, true) == "\uE862" && Glyphs.Battery(100, true) == "\uE83E");
 
         Debug.Assert(Glyphs.Signal(null) == "\uE871" && Glyphs.Signal(0) == "\uE86C" && Glyphs.Signal(4) == "\uE870" && Glyphs.Signal(9) == "\uE870");
+
+        Debug.Assert(TrayIconRenderer.ChooseBadge(5, 3) == TrayBadge.LowBattery);   // батарея важнее SMS
+        Debug.Assert(TrayIconRenderer.ChooseBadge(50, 1) == TrayBadge.Envelope);
+        Debug.Assert(TrayIconRenderer.ChooseBadge(50, 0) == TrayBadge.Percent);
+        Debug.Assert(TrayIconRenderer.ChooseBadge(null, 0) == TrayBadge.Percent);   // нет данных о батарее — не пугаем
 
         Sms a = new("A", "2026-09-23 17:39:30", "a"), b = new("B", "2026-09-23 17:40:21", "b");
         Debug.Assert(NewSince([b, a], null).Count == 0);
