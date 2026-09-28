@@ -62,7 +62,31 @@
 				IsTextSelectionEnabled="True"
 				Style="{StaticResource CaptionTextBlockStyle}" />
 		</StackPanel>
-		<PasswordBox x:Name="PasswordInput" Header="Пароль от админки роутера" />
+		<Grid ColumnSpacing="8">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+			<PasswordBox
+				x:Name="PasswordInput"
+				Header="Пароль от админки роутера"
+				PasswordRevealMode="Hidden" />
+			<!--  Своя кнопка: штатная у PasswordBox скрывается, если пароль подставлен из кода  -->
+			<ToggleButton
+				Grid.Column="1"
+				Width="{ThemeResource TextControlThemeMinHeight}"
+				Height="{ThemeResource TextControlThemeMinHeight}"
+				Padding="0"
+				VerticalAlignment="Bottom"
+				Checked="Reveal_Toggled"
+				ToolTipService.ToolTip="Показать пароль"
+				Unchecked="Reveal_Toggled">
+				<FontIcon
+					FontFamily="Segoe Fluent Icons"
+					FontSize="16"
+					Glyph="&#xE7B3;" />
+			</ToggleButton>
+		</Grid>
 		<NumberBox
 			x:Name="LimitInput"
 			Header="Лимит пакета, ГБ"

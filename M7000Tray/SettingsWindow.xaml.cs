@@ -41,6 +41,11 @@ public sealed partial class SettingsWindow : Window
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     static extern uint GetDpiForSystem();
 
+    void Reveal_Toggled(object sender, RoutedEventArgs e) =>
+        PasswordInput.PasswordRevealMode = ((Microsoft.UI.Xaml.Controls.Primitives.ToggleButton)sender).IsChecked == true
+            ? Microsoft.UI.Xaml.Controls.PasswordRevealMode.Visible
+            : Microsoft.UI.Xaml.Controls.PasswordRevealMode.Hidden;
+
     void Renew_Click(object sender, RoutedEventArgs e) => RemainingInput.Value = LimitInput.Value;
 
     void Save_Click(object sender, RoutedEventArgs e)
