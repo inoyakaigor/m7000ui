@@ -7,13 +7,17 @@ It is designed to work with the entire M7000, M7005, M7010, M7350, M7352, M7400,
 
 ## Description
 
-The application runs in the system tray, automatically checks used traffic on a TP-Link router through its internal API, and notifies about remaining gigabytes. It also displays system notifications when new SMS messages are received from the router.
+The application runs in the system tray. Once a minute it logs in to the TP-Link router web interface (`192.168.0.1`) through its internal API and:
+
+- draws a ring in the tray that shows the remaining package traffic;
+- shows a Windows notification for every new SMS;
+- shows battery charge, signal level, 4G and roaming in the settings window.
 
 ## Requirements
 
 - **OS:** Windows 10 19041 (20H2) or later
-- **.NET 10.0 SDK** (versions 10.0.111 / 10.0.201 / 10.0.303 installed)
-- **Windows App SDK 2.0** (pulled in via NuGet)
+- **.NET 10.0 SDK** — to build
+- **Windows App Runtime 2.0** — must be installed on the system. The app does not bundle the Windows App SDK: in self-contained mode SDK 2.0 crashes when it registers notifications (it cannot find `Microsoft.WindowsAppRuntime.Insights.Resource.dll`).
 
 ## Project Structure
 
@@ -23,59 +27,63 @@ M7000 UI/
 ├── M7000Lib/             # Library: TP-Link protocol, router communication
 │   ├── TPLinkProtocol.cs
 │   └── TPLinkModules.cs
-└── M7000Tray/            # TUI: system tray, settings, notifications
+└── M7000Tray/            # WinUI 3 tray app: icon, settings window, notifications
     ├── App.xaml / App.xaml.cs
     ├── SettingsWindow.xaml / SettingsWindow.xaml.cs
-    ├── RouterClient.cs
-    ├── Settings.cs
-    ├── TrayIconRenderer.cs
+    ├── RouterClient.cs       # router session: status, SMS, mark as read
+    ├── Settings.cs           # settings.ini, DPAPI password, auto-start
+    ├── TrayIconRenderer.cs   # draws the tray icon
+    ├── Glyphs.cs             # Segoe Fluent Icons glyphs: battery, signal
     └── Assets/
-        ├── app.png
-        ├── envelope.png
-        └── M7000.ico
+        ├── app.png           # source icon (for README and app-plate.png)
+        ├── app-plate.png     # icon in the notification header
+        ├── envelope.png      # picture in the SMS notification
+        └── M7000.ico         # exe and window icon
 ```
 
 ## Build
 
 ```bash
-# Restore packages and build Debug
-dotnet build
-
-# Build Release
-dotnet build -c Release
-
-# Restore packages and build Release
-dotnet restore && dotnet build -c Release
+dotnet build "M7000 UI.slnx" -p:Platform=x64
 ```
 
 ## Run from IDE / `dotnet run`
 
 ```bash
 cd M7000Tray
-dotnet run
+dotnet run -p:Platform=x64
 ```
 
-Runs the application in debug mode. A tray icon and settings window will open.
+Only a tray icon appears — the app has no main window; settings open from the icon menu.
 
-## Publishing (portable / self-contained)
+## Publishing
 
 ```bash
-# Portable build (requires .NET 10 runtime to be installed)
-dotnet publish -c Release -r win-x64 --self-contained false -o publish
-
-# Self-contained build (includes runtime)
-dotnet publish -c Release -r win-x64 --self-contained true -o publish
+dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64 --self-contained true -o publish
 ```
 
-> **Important:** When publishing in `WindowsPackageType="None"` (unpackaged) mode, XAML resources (.pri, .xbf) are automatically copied to the `publish` folder; without them the application crashes at startup.
+`--self-contained true` puts the .NET runtime into the folder. Windows App Runtime 2.0 is still required on the system (see "Requirements").
+
+> **Important:** in unpackaged mode (`WindowsPackageType=None`) `dotnet publish` drops the compiled XAML (`.pri`, `.xbf`). `M7000Tray.csproj` has a step that copies them into `publish` — without them the app crashes at startup.
 
 ## How It Works
 
-1. **Startup** → The application creates a mutex (single-instance), places an icon in the tray.
-2. **Router polling** → Every minute, `RouterClient.PollAsync()` queries used traffic.
-3. **New SMS** → Displays a Windows toast notification (AppNotification).
-4. **Settings** → Left-click on the icon opens the settings window (WebView2): router IP, username, password.
-5. **Auto-start** → On first launch, it offers to add itself to startup.
+1. **Startup.** A mutex keeps a second copy from starting. The icon appears in the tray and the first poll runs right away.
+2. **Router polling** once a minute: login, the `status` module (traffic, battery, signal, unread SMS count) and the first page of the SMS inbox. Router sessions run strictly one at a time.
+3. **Tray icon.**
+   - The ring is the remaining package traffic: full ring 100%, no ring 0%.
+   - Ring color: sky blue 100–90%, green down to 40%, yellow down to 10%, red below.
+   - Inside the ring, by priority:
+     1. a red battery when the router battery is below 10%;
+     2. a gold envelope when there are unread SMS;
+     3. the remaining percent.
+   - A gray ring with "?" means no data yet. A yellow triangle means an error; the tooltip shows the reason.
+4. **Mouse.**
+   - Left click opens the router admin page `http://192.168.0.1/login.html`.
+   - Right click opens the menu: «Настройки» (settings), «Обновить» (refresh), «Не обновлять» (pause for 5/10/20 minutes), «Выход» (exit).
+5. **New SMS** — a Windows notification with the text and a «Пометить прочитанным» (mark as read) button. The button also works when the app is closed: Windows starts it.
+6. **Wrong password.** Polling stops until the password is saved again. After 10 failed logins the router blocks login for 2 hours, so the app does not retry.
+7. **Auto-start** is on by default (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) and can be turned off with a checkbox in the settings window.
 
 ## Package limit and remaining traffic
 
@@ -89,22 +97,28 @@ While the limit or remaining fields are edited and not saved, the line above the
 
 ## Settings
 
-Settings are stored in `settings.json` (path determined via `Settings.Load()`).
+Stored in `%APPDATA%\Igor Zviagintsev\M7000\settings.ini`. You can edit the file by hand: the app picks up the change on the next poll.
 
 | Parameter | Description |
 |---|---|
-| `RouterIp` | Router IP address (default `192.168.1.1`) |
-| `PasswordProtected` | Admin web interface password |
-| `LimitGb` | Traffic limit in GB |
-| `UsedBytes` | Used bytes (updated automatically) |
+| `PasswordProtected` | Web interface password, encrypted with DPAPI (only your Windows account can decrypt it) |
+| `LimitGb` | Package limit, GB |
+| `UsedBytes` | Used from the package, bytes (counted by the app) |
+| `LastRouterTotal` | Last router traffic counter value, bytes |
+| `LastSmsTime` | Time of the last SMS that was already notified |
+| `AutoStart` | Start with Windows (`True`/`False`) |
+
+The router address is fixed in code: `192.168.0.1` (`RouterClient.RouterUrl`).
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---|---|
-| Application won't start | Make sure .NET 10.0 Desktop Runtime is installed |
-| Settings window won't open | Check that WebView2 runtime is installed |
-| Router connection error | Check IP and password in settings; the router must be on the same network |
+| App does not start or closes at once | Install Windows App Runtime 2.0 and check `crash.log` next to `settings.ini` |
+| Yellow triangle in the tray | Hover the icon — the tooltip shows the reason; the full stack is in `crash.log` |
+| «Роутер отклонил пароль» (password rejected) | Check the password in the admin page and save it again in the settings window. If login is blocked, wait 2 hours |
+| No connection to the router | The PC must be on the router network; the address is `192.168.0.1` |
+| No icon in the tray | Windows may have moved it to hidden icons (^) — drag it to the taskbar |
 
 ## Acknowledgements
 
