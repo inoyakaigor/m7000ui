@@ -8,7 +8,7 @@ public record Sms(string From, string ReceivedTime, string Content);
 
 /// <summary>RouterTotalBytes — счётчик роутера за его расчётный период (обнуляется в день оплаты).</summary>
 public record RouterSnapshot(double RouterTotalBytes, string? SimNumber, IReadOnlyList<Sms> LatestSms,
-    int? BatteryPercent, bool Charging, int? SignalLevel, bool Roaming);
+    int? BatteryPercent, bool Charging, int? SignalLevel, bool Roaming, bool Lte);
 
 /// <summary>Роутер отклонил пароль. Повторять нельзя: после 10 неудач вход блокируется на 2 часа.</summary>
 public sealed class LoginRejectedException() : Exception("Роутер отклонил пароль");
@@ -54,11 +54,14 @@ public static class RouterClient
 
         var wan = root.GetProperty("wan");
         // networkType 0 — нет сети (login.min.js: noSevrice: 0). Тогда уровень сигнала не показываем.
-        bool hasNetwork = wan.TryGetProperty("networkType", out var nt) && nt.TryGetInt32(out var ntv) && ntv != 0;
+        int networkType = wan.TryGetProperty("networkType", out var nt) && nt.TryGetInt32(out var ntv) ? ntv : 0;
+        bool hasNetwork = networkType != 0;
         int? signal = hasNetwork && wan.TryGetProperty("signalStrength", out var ss) && ss.TryGetInt32(out var sv) ? sv : null;
         bool roaming = wan.TryGetProperty("roaming", out var rm) && rm.TryGetInt32(out var rv) && rv != 0;
 
-        return new RouterSnapshot(used, sim, list, battery, charging, signal, roaming);
+        bool lte = networkType == 3; // login.min.js: lte: 3
+
+        return new RouterSnapshot(used, sim, list, battery, charging, signal, roaming, lte);
     }
 
     // Ответ с result != 0 (например -3 — нет сессии) превращаем в понятную ошибку, а не KeyNotFound дальше.

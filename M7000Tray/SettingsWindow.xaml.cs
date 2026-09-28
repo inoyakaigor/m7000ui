@@ -81,6 +81,7 @@ public sealed partial class SettingsWindow : Window
         {
             SignalStatus.Glyph = Glyphs.Signal(snap.SignalLevel);
             RoamingIcon.Visibility = snap.Roaming ? Visibility.Visible : Visibility.Collapsed;
+            NetworkIcon.Visibility = snap.Lte ? Visibility.Visible : Visibility.Collapsed;
         }
 
         if (ReadNumber(LimitInput) == _shownLimit) LimitInput.Value = _shownLimit = _settings.LimitGb;

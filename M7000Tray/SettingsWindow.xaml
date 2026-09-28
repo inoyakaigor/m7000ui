@@ -40,6 +40,7 @@
 					Foreground="#D2B001"
 					Glyph="&#xE878;" />
 				<FontIcon
+					x:Name="NetworkIcon"
 					HorizontalAlignment="Left"
 					VerticalAlignment="Top"
 					FontFamily="Segoe Fluent Icons"
