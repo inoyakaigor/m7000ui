@@ -12,6 +12,10 @@ public sealed partial class SettingsWindow : Window
     readonly Action _onSaved;
     // Что окно само подставило в поля. Отличается от введённого — значит, пользователь правил, и опрос поле не трогает.
     double _shownLimit, _shownRemaining;
+    // Последнее состояние от App — показывается, когда поля не редактируются.
+    string _status = "";
+    double? _percentLeft;
+    bool _error;
 
     public SettingsWindow(Settings settings, Action onSaved)
     {
@@ -38,6 +42,16 @@ public sealed partial class SettingsWindow : Window
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(area.X + area.Width - w - 12, area.Y + area.Height - h - 12, w, h));
 
+        // Предпросмотр по мере ввода: TextChanged внутреннего TextBox (Value у NumberBox меняется только по Enter/фокусу) и стрелки.
+        ((FrameworkElement)Content).Loaded += (_, _) =>
+        {
+            foreach (var box in (NumberBox[])[LimitInput, RemainingInput])
+            {
+                if (FindTextBox(box) is { } tb) tb.TextChanged += (_, _) => ShowStatus();
+                box.ValueChanged += (_, _) => ShowStatus();
+            }
+        };
+
         // Высота — по содержимому: иначе любая новая строка в XAML обрезает кнопку «Сохранить».
         ((FrameworkElement)Content).Loaded += (_, _) =>
         {
@@ -63,17 +77,8 @@ public sealed partial class SettingsWindow : Window
     /// <summary>Свежие данные после опроса/сохранения. percentLeft == null — данных ещё не было.</summary>
     public void Refresh(string status, double? percentLeft, bool error, RouterSnapshot? snap)
     {
-        StatusText.Text = status;
+        (_status, _percentLeft, _error) = (status, percentLeft, error);
         SimText.Text = string.IsNullOrEmpty(snap?.SimNumber) ? "Номер SIM: —" : snap.SimNumber;
-
-        StatusBar.IsIndeterminate = percentLeft is null && !error;
-        StatusBar.ShowError = error;
-        if (percentLeft is { } p)
-        {
-            StatusBar.Value = p;
-            var c = TrayIconRenderer.ColorFor(p);
-            StatusBar.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(c.A, c.R, c.G, c.B));
-        }
 
         if (snap?.BatteryPercent is { } battery)
         {
@@ -91,6 +96,25 @@ public sealed partial class SettingsWindow : Window
 
         if (ReadNumber(LimitInput) == _shownLimit) LimitInput.Value = _shownLimit = _settings.LimitGb;
         if (ReadNumber(RemainingInput) == _shownRemaining) RemainingInput.Value = _shownRemaining = CurrentRemainingGb();
+        ShowStatus();
+    }
+
+    /// <summary>Строка статуса и прогресс-бар: по введённым числам, если лимит/остаток правят, иначе — последнее от опроса.</summary>
+    void ShowStatus()
+    {
+        double limit = ReadNumber(LimitInput), remaining = ReadNumber(RemainingInput);
+        bool edited = (limit != _shownLimit || remaining != _shownRemaining) && limit > 0 && remaining >= 0;
+        double? percent = edited ? Math.Clamp(remaining / limit * 100, 0, 100) : _percentLeft;
+
+        StatusText.Text = edited ? $"Осталось {remaining:0.##} из {limit:0.##} ГБ ({percent:0.#}%) — не сохранено" : _status;
+        StatusBar.IsIndeterminate = percent is null && !_error;
+        StatusBar.ShowError = _error && !edited;
+        if (percent is { } p)
+        {
+            StatusBar.Value = p;
+            var c = TrayIconRenderer.ColorFor(p);
+            StatusBar.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(c.A, c.R, c.G, c.B));
+        }
     }
 
     static string SignalTip(RouterSnapshot s)
