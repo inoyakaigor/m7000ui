@@ -36,6 +36,17 @@ public sealed partial class SettingsWindow : Window
         int w = (int)(340 * scale), h = (int)(430 * scale);
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(area.X + area.Width - w - 12, area.Y + area.Height - h - 12, w, h));
+
+        // Высота — по содержимому: иначе любая новая строка в XAML обрезает кнопку «Сохранить».
+        ((FrameworkElement)Content).Loaded += (_, _) =>
+        {
+            var root = (FrameworkElement)Content;
+            double s = root.XamlRoot.RasterizationScale;
+            root.Measure(new Windows.Foundation.Size(AppWindow.ClientSize.Width / s, double.PositiveInfinity));
+            AppWindow.ResizeClient(new Windows.Graphics.SizeInt32(AppWindow.ClientSize.Width, (int)Math.Ceiling(root.DesiredSize.Height * s)));
+            var size = AppWindow.Size;
+            AppWindow.Move(new Windows.Graphics.PointInt32(area.X + area.Width - size.Width - 12, area.Y + area.Height - size.Height - 12));
+        };
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
