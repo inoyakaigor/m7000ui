@@ -7,7 +7,8 @@ namespace M7000Tray;
 public record Sms(string From, string ReceivedTime, string Content);
 
 /// <summary>RouterTotalBytes — счётчик роутера за его расчётный период (обнуляется в день оплаты).</summary>
-public record RouterSnapshot(double RouterTotalBytes, string? SimNumber, IReadOnlyList<Sms> LatestSms);
+public record RouterSnapshot(double RouterTotalBytes, string? SimNumber, IReadOnlyList<Sms> LatestSms,
+    int? BatteryPercent, bool Charging);
 
 /// <summary>Роутер отклонил пароль. Повторять нельзя: после 10 неудач вход блокируется на 2 часа.</summary>
 public sealed class LoginRejectedException() : Exception("Роутер отклонил пароль");
@@ -46,7 +47,12 @@ public static class RouterClient
 
         string? sim = status.RootElement.TryGetProperty("deviceInfo", out var di) && di.TryGetProperty("simNumber", out var sn) ? sn.GetString() : null;
 
-        return new RouterSnapshot(used, sim, list);
+        var root = status.RootElement;
+        // battery.voltage у M7000 — это процент заряда 0–100, а не вольты.
+        int? battery = root.TryGetProperty("battery", out var bat) && bat.TryGetProperty("voltage", out var v) && v.TryGetInt32(out var pct) ? pct : null;
+        bool charging = bat.ValueKind == JsonValueKind.Object && bat.TryGetProperty("charging", out var ch) && ch.ValueKind == JsonValueKind.True;
+
+        return new RouterSnapshot(used, sim, list, battery, charging);
     }
 
     // Ответ с result != 0 (например -3 — нет сессии) превращаем в понятную ошибку, а не KeyNotFound дальше.

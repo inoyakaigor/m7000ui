@@ -220,6 +220,9 @@ public partial class App : Application
         Debug.Assert(Settings.RouterDelta(100, 150) == 50);
         Debug.Assert(Settings.RouterDelta(900, 30) == 30);         // роутер обнулил счётчик
 
+        Debug.Assert(Glyphs.Battery(0, false) == "\uE850" && Glyphs.Battery(95, false) == "\uE859" && Glyphs.Battery(100, false) == "\uE83F");
+        Debug.Assert(Glyphs.Battery(0, true) == "\uE85A" && Glyphs.Battery(99, true) == "\uE862" && Glyphs.Battery(100, true) == "\uE83E");
+
         Sms a = new("A", "2026-09-23 17:39:30", "a"), b = new("B", "2026-09-23 17:40:21", "b");
         Debug.Assert(NewSince([b, a], null).Count == 0);
         Debug.Assert(NewSince([b, a], "2026-09-23 17:39:30") is [var only] && only == b);

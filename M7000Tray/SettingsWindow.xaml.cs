@@ -75,6 +75,9 @@ public sealed partial class SettingsWindow : Window
             StatusBar.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(c.A, c.R, c.G, c.B));
         }
 
+        if (snap?.BatteryPercent is { } battery)
+            BatteryLevel.Glyph = Glyphs.Battery(battery, snap.Charging);
+
         if (ReadNumber(LimitInput) == _shownLimit) LimitInput.Value = _shownLimit = _settings.LimitGb;
         if (ReadNumber(RemainingInput) == _shownRemaining) RemainingInput.Value = _shownRemaining = CurrentRemainingGb();
     }
