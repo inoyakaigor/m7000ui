@@ -142,6 +142,18 @@ public class TPLinkProtocol
         return await Request("message", payload, "cgi-bin/web_cgi");
     }
 
+    /// <summary>Помечает SMS прочитанным (message action=6, как markRead в tpweb.min.js). index — поле index из messageList.</summary>
+    public async Task<string> MarkSmsRead(int index)
+    {
+        var payload = new
+        {
+            module = "message",
+            action = 6,
+            markReadMessage = index
+        };
+        return await Request("message", payload, "cgi-bin/web_cgi");
+    }
+
     private string CalculateMD5(string input)
     {
         using MD5 md5 = MD5.Create();
