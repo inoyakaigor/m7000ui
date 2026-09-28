@@ -77,6 +77,16 @@ dotnet publish -c Release -r win-x64 --self-contained true -o publish
 4. **Settings** → Left-click on the icon opens the settings window (WebView2): router IP, username, password.
 5. **Auto-start** → On first launch, it offers to add itself to startup.
 
+## Package limit and remaining traffic
+
+The app counts how much of the package is used by itself: every minute it adds how much the router counter grew since the last poll. You set the package size and the starting point in the settings window.
+
+- **Лимит пакета, ГБ** (package limit, GB) — the size of your operator package.
+- **Осталось сейчас, ГБ** (remaining now, GB) — how much traffic is really left. The field shows the current remaining value; if it differs from the operator data (for example, from a balance SMS), type the correct number and press «Сохранить» (Save) — the app recalculates the usage.
+- **Пакет продлён** (package renewed) — press it when the operator renewed the package or you bought a new one and the traffic is full again. The button sets "remaining" equal to the limit; then press «Сохранить» (Save) and the usage starts from zero. If the new package has a different size, change the package limit first.
+
+While the limit or remaining fields are edited and not saved, the line above the progress bar and the bar itself show the typed values marked «не сохранено» (not saved). The tray icon and the settings file change only after Save.
+
 ## Settings
 
 Settings are stored in `settings.json` (path determined via `Settings.Load()`).
