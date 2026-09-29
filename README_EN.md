@@ -73,12 +73,18 @@ dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64 
 3. **Tray icon.**
    - The ring is the remaining package traffic: full ring 100%, no ring 0%.
    - Ring color: sky blue 100–90%, green down to 40%, yellow down to 10%, red below.
-   - Inside the ring, by priority:
-     1. a red battery when the router battery is below 10%;
-     2. a gold envelope when there are unread SMS;
-     3. the remaining percent.
-   - While polling is paused, a white pause sign is drawn in the bottom right corner on top of any of them.
-   - A gray ring with "?" means no data yet. A yellow triangle means an error; the tooltip shows the reason.
+
+   <img src="./tray-states.png" alt="Tray icon states">
+
+   Left to right: battery below 10%, unread SMS, percent, percent while paused, no data, error.
+
+   - Inside the ring the icon shows one of three things, by priority — when several conditions are true, the upper one wins:
+     1. a red battery when the router battery is below 10% (most important: the router will turn off soon);
+     2. a gold envelope when there are unread SMS; it goes away when the SMS is marked read;
+     3. the remaining percent — everything is fine.
+   - Pause is not a separate state but an overlay: while polling is paused, a white pause sign in the bottom right corner is drawn on top of any of the three.
+   - A gray ring with "?" means no data yet (the first seconds after start).
+   - A yellow triangle means an error: it replaces the whole icon, and the tooltip shows the reason.
 4. **Mouse.**
    - Left click opens the router admin page `http://192.168.0.1/login.html` and pauses polling for 5 minutes — otherwise the app poll would log you out of the admin page.
    - Right click opens the menu: «Настройки» (settings), «Обновить» (refresh), «Не обновлять» (pause for 5/10/20 minutes), «Выход» (exit).

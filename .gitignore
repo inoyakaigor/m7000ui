@@ -112,3 +112,6 @@ AngularBuild/
 ## Visual Studio 2024 cache
 *.slnx.userprefs
 
+
+## Local screenshots
+tray icons.png
