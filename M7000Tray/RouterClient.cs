@@ -41,7 +41,11 @@ public static partial class RouterClient
         try
         {
             if (!await router.Handshake()) throw new Exception("Роутер не ответил на handshake");
-            if (!await router.Login(password)) throw new LoginRejectedException();
+            if (!await router.Login(password))
+                // Неверный пароль — только result 1. Остальное (мусор вместо ответа, другой код) — сбой: повторим в новой сессии.
+                throw router.LastLoginResult == 1
+                    ? new LoginRejectedException()
+                    : new BadResponseException($"Роутер не принял вход (result {router.LastLoginResult?.ToString() ?? "не разобран"})");
             return (http, router);
         }
         catch { http.Dispose(); throw; }

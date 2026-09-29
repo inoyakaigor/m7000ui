@@ -149,10 +149,11 @@ public partial class App : Application
                 _settings.Save();
             }
         }
-        catch (LoginRejectedException)
+        catch (LoginRejectedException ex)
         {
             _loginRejected = true;
-            _status = "Роутер отклонил пароль. Опрос остановлен — введите пароль заново";
+            Settings.LogCrash(ex); // редкое и важное событие — пусть будет видно, когда это случилось
+            _status = "Роутер отклонил пароль. Опрос остановлен — проверьте пароль в настройках или нажмите «Обновить»";
             UpdateTray(null, warning: true);
         }
         catch (Exception ex) when (RouterClient.IsNetworkError(ex))
@@ -269,6 +270,7 @@ public partial class App : Application
     void Resume()
     {
         _pausedUntil = default;
+        _loginRejected = false; // явная просьба пользователя — одна попытка входа
         _ = PollAsync();
     }
 

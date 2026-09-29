@@ -91,7 +91,7 @@ dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64 
    - Left click opens the router admin page `http://192.168.0.1/login.html` and pauses polling for 5 minutes — otherwise the app poll would log you out of the admin page.
    - Right click opens the menu: «Настройки» (settings), «Обновить» (refresh), «Не обновлять» (pause for 5/10/20 minutes), «Выход» (exit).
 6. **New SMS** — a Windows notification with the text and a «Пометить прочитанным» (mark as read) button. The button also works when the app is closed: Windows starts it.
-7. **Wrong password.** Polling stops until the password is saved again. After 10 failed logins the router blocks login for 2 hours, so the app does not retry.
+7. **Wrong password** — only when the router clearly answers "wrong password" (`result 1`); if the login response cannot be read, login is retried in a new session. Polling stops until the password is saved again or «Обновить» (refresh) is pressed in the menu. After 10 failed logins the router blocks login for 2 hours, so the app does not retry.
 8. **Auto-start** is on by default (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) and can be turned off with a checkbox in the settings window.
 
 ## Package limit and remaining traffic
@@ -126,7 +126,7 @@ The router address is fixed in code: `192.168.0.1` (`RouterClient.RouterUrl`).
 |---|---|
 | App does not start or closes at once | Install Windows App Runtime 2.0 and check `crash.log` next to `settings.ini` |
 | Yellow triangle in the tray | Hover the icon — the tooltip shows the reason; the full stack is in `crash.log` |
-| «Роутер отклонил пароль» (password rejected) | Check the password in the admin page and save it again in the settings window. If login is blocked, wait 2 hours |
+| «Роутер отклонил пароль» (password rejected) | The router answered "wrong password" (`result 1`). Check the password in the admin page and save it again in the settings window, or press «Обновить» (refresh) in the menu — that is one login attempt. If login is blocked, wait 2 hours |
 | «Нет связи с роутером» (no connection) | The PC must be on the router network; the address is `192.168.0.1`. Network failures are not written to `crash.log` |
 | «Другая сеть — роутер M7000 не найден» on your own network | The router was replaced or reset: save the password again in the settings window or delete `RouterMac` from `settings.ini` — the app remembers the new MAC |
 | No icon in the tray | Windows may have moved it to hidden icons (^) — drag it to the taskbar |
