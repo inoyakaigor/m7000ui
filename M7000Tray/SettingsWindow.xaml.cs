@@ -149,6 +149,8 @@ public sealed partial class SettingsWindow : Window
 
     void Save_Click(object sender, RoutedEventArgs e)
     {
+        // Новый пароль — возможно, новый роутер: забываем MAC, при следующем опросе запомним заново.
+        if (PasswordInput.Password != _settings.Password) _settings.RouterMac = null;
         _settings.Password = PasswordInput.Password;
         double limitIn = ReadNumber(LimitInput), remainingIn = ReadNumber(RemainingInput);
         double limit = !double.IsNaN(limitIn) && limitIn > 0 ? limitIn : _shownLimit;

@@ -69,8 +69,9 @@ dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64 
 ## How It Works
 
 1. **Startup.** A mutex keeps a second copy from starting. The icon appears in the tray and the first poll runs right away.
-2. **Router polling** once a minute: login, the `status` module (traffic, battery, signal, unread SMS count) and the first page of the SMS inbox. Router sessions run strictly one at a time.
-3. **Tray icon.**
+2. **Network check.** Before every poll the app gets the MAC of the device at `192.168.0.1` through ARP — no login and no HTTP, so the router does not spend a login attempt. The app remembers its router MAC on the first successful poll. If the MAC is different (you joined another network that also uses `192.168.0.1`), there is no poll and no login; the tray shows the plain app icon and the tooltip «Другая сеть — роутер M7000 не найден» (another network, M7000 not found). If nobody answers ARP, the tooltip says «Нет связи с роутером» (no connection to the router). When the network appears or changes (wake from sleep, another Wi-Fi), a poll runs after 3 seconds instead of waiting a minute.
+3. **Router polling** once a minute: login, the `status` module (traffic, battery, signal, unread SMS count) and the first page of the SMS inbox. Router sessions run strictly one at a time.
+4. **Tray icon.**
    - The ring is the remaining package traffic: full ring 100%, no ring 0%.
    - Ring color: sky blue 100–90%, green down to 40%, yellow down to 10%, red below.
 
@@ -84,13 +85,14 @@ dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64 
      3. the remaining percent — everything is fine.
    - Pause is not a separate state but an overlay: while polling is paused, a white pause sign in the bottom right corner is drawn on top of any of the three.
    - A gray ring with "?" means no data yet (the first seconds after start).
-   - A yellow triangle means an error: it replaces the whole icon, and the tooltip shows the reason.
-4. **Mouse.**
+   - A yellow triangle means an error or no connection: it replaces the whole icon, and the tooltip shows the reason.
+   - The router icon (same as the exe) means the PC is on another network; the app waits for its router.
+5. **Mouse.**
    - Left click opens the router admin page `http://192.168.0.1/login.html` and pauses polling for 5 minutes — otherwise the app poll would log you out of the admin page.
    - Right click opens the menu: «Настройки» (settings), «Обновить» (refresh), «Не обновлять» (pause for 5/10/20 minutes), «Выход» (exit).
-5. **New SMS** — a Windows notification with the text and a «Пометить прочитанным» (mark as read) button. The button also works when the app is closed: Windows starts it.
-6. **Wrong password.** Polling stops until the password is saved again. After 10 failed logins the router blocks login for 2 hours, so the app does not retry.
-7. **Auto-start** is on by default (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) and can be turned off with a checkbox in the settings window.
+6. **New SMS** — a Windows notification with the text and a «Пометить прочитанным» (mark as read) button. The button also works when the app is closed: Windows starts it.
+7. **Wrong password.** Polling stops until the password is saved again. After 10 failed logins the router blocks login for 2 hours, so the app does not retry.
+8. **Auto-start** is on by default (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) and can be turned off with a checkbox in the settings window.
 
 ## Package limit and remaining traffic
 
@@ -112,6 +114,7 @@ Stored in `%APPDATA%\Igor Zviagintsev\M7000\settings.ini`. You can edit the file
 | `LimitGb` | Package limit, GB |
 | `UsedBytes` | Used from the package, bytes (counted by the app) |
 | `LastRouterTotal` | Last router traffic counter value, bytes |
+| `RouterMac` | MAC of your router — remembered on the first successful poll, reset when a new password is saved |
 | `LastSmsTime` | Time of the last SMS that was already notified |
 | `AutoStart` | Start with Windows (`True`/`False`) |
 
@@ -124,7 +127,8 @@ The router address is fixed in code: `192.168.0.1` (`RouterClient.RouterUrl`).
 | App does not start or closes at once | Install Windows App Runtime 2.0 and check `crash.log` next to `settings.ini` |
 | Yellow triangle in the tray | Hover the icon — the tooltip shows the reason; the full stack is in `crash.log` |
 | «Роутер отклонил пароль» (password rejected) | Check the password in the admin page and save it again in the settings window. If login is blocked, wait 2 hours |
-| No connection to the router | The PC must be on the router network; the address is `192.168.0.1` |
+| «Нет связи с роутером» (no connection) | The PC must be on the router network; the address is `192.168.0.1`. Network failures are not written to `crash.log` |
+| «Другая сеть — роутер M7000 не найден» on your own network | The router was replaced or reset: save the password again in the settings window or delete `RouterMac` from `settings.ini` — the app remembers the new MAC |
 | No icon in the tray | Windows may have moved it to hidden icons (^) — drag it to the taskbar |
 
 ## Acknowledgements

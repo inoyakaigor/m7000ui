@@ -11,6 +11,9 @@ public enum TrayBadge { Percent, Envelope, LowBattery }
 
 public static partial class TrayIconRenderer
 {
+    /// <summary>Размер иконки трея в пикселях для текущего DPI (16 px при 100%).</summary>
+    public static int IconSize => 16 * (int)GetDpiForSystem() / 96;
+
     public static readonly Color Gold = Color.FromArgb(0xD2, 0xB0, 0x01); // как значок роуминга в окне настроек
 
     public static TrayBadge ChooseBadge(int? batteryPercent, int unreadSms) =>
@@ -27,7 +30,7 @@ public static partial class TrayIconRenderer
     /// <summary>percent = остаток трафика 0..100; null — данных ещё нет, идёт загрузка (серое кольцо и «?»).</summary>
     public static Icon Render(double? percent, TrayBadge badge = TrayBadge.Percent, int batteryPercent = 0, bool charging = false, bool paused = false)
     {
-        int size = 16 * (int)GetDpiForSystem() / 96;
+        int size = IconSize;
         using var bmp = new Bitmap(size, size);
         using (var g = Graphics.FromImage(bmp))
         {

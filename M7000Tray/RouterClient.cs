@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace M7000Tray;
@@ -9,7 +11,7 @@ public record Sms(string From, string ReceivedTime, string Content, int Index = 
 /// <summary>RouterTotalBytes — счётчик роутера за его расчётный период (обнуляется в день оплаты).</summary>
 public record RouterSnapshot(double RouterTotalBytes, string? SimNumber, IReadOnlyList<Sms> LatestSms,
     int? BatteryPercent, bool Charging, int? SignalLevel, bool Roaming, bool Lte,
-    double? Rsrp, double? Rsrq, double? Snr, int UnreadSms);
+    double? Rsrp, double? Rsrq, double? Snr, int UnreadSms, string? RouterMac);
 
 /// <summary>Роутер отклонил пароль. Повторять нельзя: после 10 неудач вход блокируется на 2 часа.</summary>
 public sealed class LoginRejectedException() : Exception("Роутер отклонил пароль");
@@ -17,7 +19,7 @@ public sealed class LoginRejectedException() : Exception("Роутер откл�
 /// <summary>Ответ роутера не разобрался как JSON — обычно расшифровался в мусор. Помогает новая сессия.</summary>
 public sealed class BadResponseException(string message) : Exception(message);
 
-public static class RouterClient
+public static partial class RouterClient
 {
     public const string RouterUrl = "http://192.168.0.1/";
 
@@ -108,7 +110,36 @@ public static class RouterClient
         double? snr = Num("snr") / 10;
 
         return new RouterSnapshot(used, sim, list, battery, charging, signal, roaming, lte, Num("rsrp"), Num("rsrq"), snr,
-            root.TryGetProperty("message", out var msg) && msg.TryGetProperty("unreadMessages", out var um) && um.TryGetInt32(out var u) ? u : 0);
+            root.TryGetProperty("message", out var msg) && msg.TryGetProperty("unreadMessages", out var um) && um.TryGetInt32(out var u) ? u : 0,
+            di.ValueKind == JsonValueKind.Object && di.TryGetProperty("mac", out var mac) && mac.GetString() is { } m ? NormalizeMac(m) : null);
+    }
+
+    /// <summary>"3C:6A:D2:24:DC:A0" / "3c-6a-..." → "3C6AD224DCA0".</summary>
+    public static string NormalizeMac(string mac) => new string(mac.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
+
+    /// <summary>
+    /// MAC устройства на 192.168.0.1 через ARP (SendARP: из кэша или ARP-запросом). Это не HTTP и не логин —
+    /// роутер не выдаёт nonce и не тратит попытку входа. null — никто не ответил (нет сети или роутера).
+    /// Блокирует поток до ~3 с, звать из Task.Run.
+    /// </summary>
+    public static string? GatewayMac()
+    {
+        uint ip = BitConverter.ToUInt32(IPAddress.Parse(new Uri(RouterUrl).Host).GetAddressBytes(), 0);
+        var buf = new byte[6];
+        uint len = (uint)buf.Length;
+        if (SendARP(ip, 0, buf, ref len) != 0 || len == 0) return null;
+        return Convert.ToHexString(buf, 0, (int)len);
+    }
+
+    [LibraryImport("iphlpapi.dll")]
+    private static partial int SendARP(uint destIp, uint srcIp, byte[] macAddr, ref uint macAddrLen);
+
+    /// <summary>Сетевой сбой (нет сети, обрыв, таймаут) — не баг приложения, в crash.log не пишем.</summary>
+    public static bool IsNetworkError(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+            if (e is SocketException or HttpRequestException or TaskCanceledException or TimeoutException or IOException) return true;
+        return false;
     }
 
     // Ответ с result != 0 (например -3 — нет сессии) превращаем в понятную ошибку, а не KeyNotFound дальше.

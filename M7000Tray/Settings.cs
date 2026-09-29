@@ -17,6 +17,9 @@ public sealed class Settings
     public double UsedBytes { get; set; }
     // Последнее увиденное значение totalStatistics роутера — база для следующего приращения.
     public double? LastRouterTotal { get; set; }
+    // MAC нашего роутера (без разделителей, заглавными). Запоминается при первом успешном опросе;
+    // в сети, где у 192.168.0.1 другой MAC, приложение не логинится.
+    public string? RouterMac { get; set; }
 
     public const double BytesPerGb = 1024d * 1024 * 1024; // роутер считает в ГиБ
 
@@ -76,6 +79,7 @@ public sealed class Settings
                 case nameof(LastSmsTime): s.LastSmsTime = value.Length > 0 ? value : null; break;
                 case nameof(AutoStart) when bool.TryParse(value, out var on): s.AutoStart = on; break;
                 case nameof(UsedBytes) when double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var used): s.UsedBytes = used; break;
+                case nameof(RouterMac): s.RouterMac = value.Length > 0 ? value : null; break;
                 case nameof(LastRouterTotal) when double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var total): s.LastRouterTotal = total; break;
             }
         }
@@ -93,6 +97,7 @@ public sealed class Settings
         AutoStart = f.AutoStart;
         UsedBytes = f.UsedBytes;
         LastRouterTotal = f.LastRouterTotal;
+        RouterMac = f.RouterMac;
         _fileTime = f._fileTime;
         return true;
     }
@@ -109,6 +114,7 @@ public sealed class Settings
             $"{nameof(AutoStart)}={AutoStart}",
             $"{nameof(UsedBytes)}={UsedBytes.ToString("R", CultureInfo.InvariantCulture)}",
             $"{nameof(LastRouterTotal)}={LastRouterTotal?.ToString("R", CultureInfo.InvariantCulture)}",
+            $"{nameof(RouterMac)}={RouterMac}",
         ]);
         _fileTime = File.GetLastWriteTimeUtc(FilePath);
     }

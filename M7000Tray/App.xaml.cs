@@ -21,6 +21,8 @@ public partial class App : Application
     TaskbarIcon? _tray;
     System.Drawing.Icon? _currentIcon;
     DispatcherQueueTimer? _timer;
+    DispatcherQueueTimer? _networkTimer; // опрос через пару секунд после смены сети (держим ссылку от GC)
+    bool _foreignNetwork; // на 192.168.0.1 не наш роутер
     SettingsWindow? _settingsWindow;
     bool _polling;
     bool _loginRejected; // не долбим роутер неверным паролем, пока пользователь не сохранит новый
@@ -90,6 +92,15 @@ public partial class App : Application
         _timer.Interval = TimeSpan.FromMinutes(1);
         _timer.Tick += (_, _) => _ = PollAsync();
         _timer.Start();
+
+        // Сеть появилась или сменилась (выход из сна, другой Wi-Fi) — опросить сразу, не ждать минуту.
+        // Событие приходит пачкой и не в UI-потоке: перезапускаем одноразовый таймер на 3 с.
+        _networkTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
+        _networkTimer.Interval = TimeSpan.FromSeconds(3);
+        _networkTimer.IsRepeating = false;
+        _networkTimer.Tick += (_, _) => _ = PollAsync();
+        var netUi = DispatcherQueue.GetForCurrentThread();
+        System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += (sender, e) => netUi.TryEnqueue(() => { _networkTimer.Stop(); _networkTimer.Start(); });
         _ = PollAsync();
     }
 
@@ -118,8 +129,11 @@ public partial class App : Application
         _polling = true;
         try
         {
+            if (!await IsOurRouterAsync()) return;
+
             var snap = await Task.Run(() => RouterClient.PollAsync(_settings.Password));
             _lastSnap = snap;
+            if (_settings.RouterMac is null && snap.RouterMac is not null) _settings.RouterMac = snap.RouterMac; // запомнили свой роутер
 
             _settings.UsedBytes += Settings.RouterDelta(_settings.LastRouterTotal, snap.RouterTotalBytes);
             _settings.LastRouterTotal = snap.RouterTotalBytes;
@@ -141,6 +155,11 @@ public partial class App : Application
             _status = "Роутер отклонил пароль. Опрос остановлен — введите пароль заново";
             UpdateTray(null, warning: true);
         }
+        catch (Exception ex) when (RouterClient.IsNetworkError(ex))
+        {
+            _status = "Нет связи с роутером";
+            UpdateTray(null, warning: true);
+        }
         catch (Exception ex)
         {
             _status = $"Ошибка: {ex.Message}";
@@ -148,6 +167,30 @@ public partial class App : Application
             UpdateTray(null, warning: true);
         }
         finally { _polling = false; }
+    }
+
+    /// <summary>
+    /// true — на 192.168.0.1 наш роутер (или он ещё не запомнен), можно логиниться.
+    /// false — нет связи или чужая сеть: статус и иконка уже выставлены, логина не будет.
+    /// </summary>
+    async Task<bool> IsOurRouterAsync()
+    {
+        string? mac = await Task.Run(RouterClient.GatewayMac);
+        if (mac is null)
+        {
+            _foreignNetwork = false;
+            _status = "Нет связи с роутером";
+            UpdateTray(null, warning: true);
+            return false;
+        }
+        _foreignNetwork = _settings.RouterMac is { } known && mac != known;
+        if (_foreignNetwork)
+        {
+            _status = "Другая сеть — роутер M7000 не найден";
+            UpdateTray(null);
+            return false;
+        }
+        return true;
     }
 
     void ShowTraffic()
@@ -181,6 +224,7 @@ public partial class App : Application
         if (string.IsNullOrEmpty(_settings.PasswordProtected) || _loginRejected) return;
         try
         {
+            if (!await IsOurRouterAsync()) return; // чужой роутер с тем же адресом — не логинимся
             await Task.Run(() => RouterClient.MarkReadAsync(_settings.Password, index));
             await PollAsync(); // обновить конверт в трее
         }
@@ -197,8 +241,11 @@ public partial class App : Application
         if (_tray is null) return;
         var old = _currentIcon;
         // warning — стандартный жёлтый треугольник Windows (SIID_WARNING), нужного для трея размера.
+        // Чужая сеть — обычная иконка приложения: это не ошибка, просто роутера рядом нет.
         _currentIcon = warning
             ? System.Drawing.SystemIcons.GetStockIcon(System.Drawing.StockIconId.Warning, System.Drawing.StockIconOptions.SmallIcon)
+            : _foreignNetwork
+            ? new System.Drawing.Icon(Path.Combine(AppContext.BaseDirectory, "Assets", "M7000.ico"), TrayIconRenderer.IconSize, TrayIconRenderer.IconSize)
             : TrayIconRenderer.Render(percentLeft,
                 TrayIconRenderer.ChooseBadge(_lastSnap?.BatteryPercent, _lastSnap?.UnreadSms ?? 0),
                 _lastSnap?.BatteryPercent ?? 0, _lastSnap?.Charging ?? false, paused: DateTime.Now < _pausedUntil);
@@ -264,6 +311,11 @@ public partial class App : Application
         Debug.Assert(TrayIconRenderer.ChooseBadge(50, 1) == TrayBadge.Envelope);
         Debug.Assert(TrayIconRenderer.ChooseBadge(50, 0) == TrayBadge.Percent);
         Debug.Assert(TrayIconRenderer.ChooseBadge(null, 0) == TrayBadge.Percent);   // нет данных о батарее — не пугаем
+
+        Debug.Assert(RouterClient.NormalizeMac("3c:6a:d2:24:dc:a0") == "3C6AD224DCA0");
+        Debug.Assert(RouterClient.NormalizeMac("3C-6A-D2-24-DC-A0") == RouterClient.NormalizeMac("3C:6A:D2:24:DC:A0"));
+        Debug.Assert(RouterClient.IsNetworkError(new HttpRequestException("x", new System.Net.Sockets.SocketException(10051))));
+        Debug.Assert(!RouterClient.IsNetworkError(new LoginRejectedException()));
 
         Sms a = new("A", "2026-09-23 17:39:30", "a"), b = new("B", "2026-09-23 17:40:21", "b");
         Debug.Assert(NewSince([b, a], null).Count == 0);
