@@ -201,7 +201,7 @@ public partial class App : Application
             ? System.Drawing.SystemIcons.GetStockIcon(System.Drawing.StockIconId.Warning, System.Drawing.StockIconOptions.SmallIcon)
             : TrayIconRenderer.Render(percentLeft,
                 TrayIconRenderer.ChooseBadge(_lastSnap?.BatteryPercent, _lastSnap?.UnreadSms ?? 0),
-                _lastSnap?.BatteryPercent ?? 0, _lastSnap?.Charging ?? false);
+                _lastSnap?.BatteryPercent ?? 0, _lastSnap?.Charging ?? false, paused: DateTime.Now < _pausedUntil);
         _tray.Icon = _currentIcon;
         old?.Dispose();
         string tip = DateTime.Now < _pausedUntil ? $"{_status}\nОпрос приостановлен до {_pausedUntil:HH:mm}" : _status;

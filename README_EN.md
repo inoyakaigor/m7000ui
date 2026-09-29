@@ -77,6 +77,7 @@ dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64 
      1. a red battery when the router battery is below 10%;
      2. a gold envelope when there are unread SMS;
      3. the remaining percent.
+   - While polling is paused, a white pause sign is drawn in the bottom right corner on top of any of them.
    - A gray ring with "?" means no data yet. A yellow triangle means an error; the tooltip shows the reason.
 4. **Mouse.**
    - Left click opens the router admin page `http://192.168.0.1/login.html` and pauses polling for 5 minutes — otherwise the app poll would log you out of the admin page.

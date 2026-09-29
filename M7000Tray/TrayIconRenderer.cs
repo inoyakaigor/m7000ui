@@ -6,7 +6,7 @@ using Microsoft.Win32;
 
 namespace M7000Tray;
 
-/// <summary>Что рисовать внутри кольца. Порядок — приоритет: LowBattery важнее Envelope, Envelope важнее Percent.</summary>
+/// <summary>Что рисовать внутри кольца. Приоритет: LowBattery > Envelope > Percent. Пауза — отдельный оверлей поверх любого.</summary>
 public enum TrayBadge { Percent, Envelope, LowBattery }
 
 public static partial class TrayIconRenderer
@@ -25,7 +25,7 @@ public static partial class TrayIconRenderer
     };
 
     /// <summary>percent = остаток трафика 0..100; null — данных ещё нет, идёт загрузка (серое кольцо и «?»).</summary>
-    public static Icon Render(double? percent, TrayBadge badge = TrayBadge.Percent, int batteryPercent = 0, bool charging = false)
+    public static Icon Render(double? percent, TrayBadge badge = TrayBadge.Percent, int batteryPercent = 0, bool charging = false, bool paused = false)
     {
         int size = 16 * (int)GetDpiForSystem() / 96;
         using var bmp = new Bitmap(size, size);
@@ -76,17 +76,40 @@ public static partial class TrayIconRenderer
             path.Transform(shift);
             g.FillPath(brush, path);
             // Глифы Fluent — тонкий контур, в 16–32 px он бледнеет. Обводим тем же цветом для толщины.
-            if (badge != TrayBadge.Percent)
+            if (badge is TrayBadge.Envelope or TrayBadge.LowBattery)
             {
                 using var pen = new Pen(color, Math.Max(1f, size / 20f)) { LineJoin = LineJoin.Round };
                 g.DrawPath(pen, path);
             }
+
+            if (paused) DrawPauseOverlay(g, size); // поверх любого значка
         }
 
         // Icon.FromHandle не владеет HICON: клонируем в самостоятельную иконку и сразу освобождаем исходный.
         IntPtr h = bmp.GetHicon();
         try { return (Icon)Icon.FromHandle(h).Clone(); }
         finally { DestroyIcon(h); }
+    }
+
+    /// <summary>F175 — оверлей-пауза из Segoe Fluent Icons: в клетке шрифта сидит в правом нижнем углу.
+    /// Шрифт в 1,5 раза больше иконки, иначе пауза в трее — пара пикселей; подложка — чёрная, альфа 50%.</summary>
+    static void DrawPauseOverlay(Graphics g, int size)
+    {
+        using var family = new FontFamily("Segoe Fluent Icons");
+        using var path = new GraphicsPath();
+        path.AddString("\uF175", family, (int)FontStyle.Regular, size * 1.5f, PointF.Empty, StringFormat.GenericTypographic);
+        var b = path.GetBounds();
+        float inset = size * 0.1f;
+        using var shift = new Matrix();
+        shift.Translate(size - inset - b.Right, size - inset - b.Bottom); // прижать к правому нижнему углу
+        path.Transform(shift);
+        b = path.GetBounds();
+
+        float padX = b.Width * 0.45f, padY = b.Height * 0.3f;
+        using var back = new SolidBrush(Color.FromArgb(128, 0, 0, 0));
+        g.FillEllipse(back, b.X - padX, b.Y - padY, b.Width + 2 * padX, b.Height + 2 * padY);
+        using var brush = new SolidBrush(Color.White);
+        g.FillPath(brush, path);
     }
 
     static bool IsTaskbarLight() =>
