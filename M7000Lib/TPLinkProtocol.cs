@@ -19,6 +19,9 @@ public class TPLinkProtocol
     private BigInteger _rsaMod;
     private string _nonce = string.Empty;
     private string? _token;
+
+    /// <summary>result последнего Login: 0 — успех, 1 — неверный пароль (login.min.js), null — ответ не разобран (например, расшифровался в мусор).</summary>
+    public int? LastLoginResult { get; private set; }
     private bool _useGdpr = false;
 
     public TPLinkProtocol(HttpClient http, System.Net.CookieContainer cookies)
@@ -329,6 +332,7 @@ public class TPLinkProtocol
 
     public async Task<bool> Login(string password)
     {
+        LastLoginResult = null;
         // RSA хеш: MD5("admin" + password)
         _hash = CalculateMD5("admin" + password);
 
@@ -365,6 +369,7 @@ public class TPLinkProtocol
             if (doc.RootElement.TryGetProperty("result", out var resultValue) && resultValue.ValueKind == JsonValueKind.Number)
             {
                 resultInt = resultValue.GetInt32();
+                LastLoginResult = resultInt;
             }
 
             // В login.min.js прошивки: success = 0, pwdWrong = 1. Остальное — неизвестная ошибка.
