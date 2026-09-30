@@ -22,7 +22,7 @@ public partial class App : Application
     System.Drawing.Icon? _currentIcon;
     DispatcherQueueTimer? _timer;
     DispatcherQueueTimer? _networkTimer; // опрос через пару секунд после смены сети (держим ссылку от GC)
-    bool _foreignNetwork; // на 192.168.0.1 не наш роутер
+    bool _showAppIcon; // сети нет или она чужая — не ошибка: в трее просто иконка приложения
     SettingsWindow? _settingsWindow;
     bool _polling;
     bool _loginRejected; // не долбим роутер неверным паролем, пока пользователь не сохранит новый
@@ -176,22 +176,31 @@ public partial class App : Application
     /// </summary>
     async Task<bool> IsOurRouterAsync()
     {
+        var link = RouterClient.GetLinkState();
+        if (link != LinkState.RouterSubnet)
+            return ShowAppIcon(link == LinkState.NoNetwork ? "Компьютер не подключён к сети" : "Другая сеть — роутер M7000 не найден");
+
         string? mac = await Task.Run(RouterClient.GatewayMac);
         if (mac is null)
         {
-            _foreignNetwork = false;
-            _status = "Нет связи с роутером";
+            _showAppIcon = false;
+            _status = "Нет связи с роутером"; // сеть роутера есть, а он не отвечает — это уже тревога
             UpdateTray(null, warning: true);
             return false;
         }
-        _foreignNetwork = _settings.RouterMac is { } known && mac != known;
-        if (_foreignNetwork)
-        {
-            _status = "Другая сеть — роутер M7000 не найден";
-            UpdateTray(null);
-            return false;
-        }
+        if (_settings.RouterMac is { } known && mac != known)
+            return ShowAppIcon("Другая сеть — роутер M7000 не найден");
+
+        _showAppIcon = false;
         return true;
+    }
+
+    bool ShowAppIcon(string status)
+    {
+        _showAppIcon = true;
+        _status = status;
+        UpdateTray(null);
+        return false;
     }
 
     void ShowTraffic()
@@ -242,10 +251,10 @@ public partial class App : Application
         if (_tray is null) return;
         var old = _currentIcon;
         // warning — стандартный жёлтый треугольник Windows (SIID_WARNING), нужного для трея размера.
-        // Чужая сеть — обычная иконка приложения: это не ошибка, просто роутера рядом нет.
+        // Нет сети или чужая сеть — обычная иконка приложения: это не ошибка, просто роутера рядом нет.
         _currentIcon = warning
             ? System.Drawing.SystemIcons.GetStockIcon(System.Drawing.StockIconId.Warning, System.Drawing.StockIconOptions.SmallIcon)
-            : _foreignNetwork
+            : _showAppIcon
             ? new System.Drawing.Icon(Path.Combine(AppContext.BaseDirectory, "Assets", "M7000.ico"), TrayIconRenderer.IconSize, TrayIconRenderer.IconSize)
             : TrayIconRenderer.Render(percentLeft,
                 TrayIconRenderer.ChooseBadge(_lastSnap?.BatteryPercent, _lastSnap?.UnreadSms ?? 0),
@@ -318,6 +327,9 @@ public partial class App : Application
         Debug.Assert(RouterClient.NormalizeMac("3C-6A-D2-24-DC-A0") == RouterClient.NormalizeMac("3C:6A:D2:24:DC:A0"));
         Debug.Assert(RouterClient.IsNetworkError(new HttpRequestException("x", new System.Net.Sockets.SocketException(10051))));
         Debug.Assert(!RouterClient.IsNetworkError(new LoginRejectedException()));
+        Debug.Assert(RouterClient.SameSubnet(System.Net.IPAddress.Parse("192.168.0.153"), 24, System.Net.IPAddress.Parse("192.168.0.1")));
+        Debug.Assert(!RouterClient.SameSubnet(System.Net.IPAddress.Parse("192.168.1.20"), 24, System.Net.IPAddress.Parse("192.168.0.1")));
+        Debug.Assert(RouterClient.SameSubnet(System.Net.IPAddress.Parse("192.168.1.20"), 16, System.Net.IPAddress.Parse("192.168.0.1")));
 
         Sms a = new("A", "2026-09-23 17:39:30", "a"), b = new("B", "2026-09-23 17:40:21", "b");
         Debug.Assert(NewSince([b, a], null).Count == 0);

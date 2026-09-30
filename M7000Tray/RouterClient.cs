@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -18,6 +19,9 @@ public sealed class LoginRejectedException() : Exception("Роутер откл�
 
 /// <summary>Ответ роутера не разобрался как JSON — обычно расшифровался в мусор. Помогает новая сессия.</summary>
 public sealed class BadResponseException(string message) : Exception(message);
+
+/// <summary>Есть ли у компьютера сеть роутера: адрес в его подсети; иначе — другая сеть или сети нет вовсе.</summary>
+public enum LinkState { NoNetwork, OtherNetwork, RouterSubnet }
 
 public static partial class RouterClient
 {
@@ -137,6 +141,34 @@ public static partial class RouterClient
 
     [LibraryImport("iphlpapi.dll")]
     private static partial int SendARP(uint destIp, uint srcIp, byte[] macAddr, ref uint macAddrLen);
+
+    /// <summary>
+    /// По адресам сетевых адаптеров: есть ли у нас адрес в подсети роутера. Не ходит в сеть.
+    /// GetIsNetworkAvailable не годится — VPN-адаптер (wt0 и т.п.) держит его в true и без Wi-Fi.
+    /// </summary>
+    public static LinkState GetLinkState()
+    {
+        var router = IPAddress.Parse(new Uri(RouterUrl).Host);
+        bool anyGateway = false;
+        foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel) continue;
+            var props = nic.GetIPProperties();
+            foreach (var ua in props.UnicastAddresses)
+                if (ua.Address.AddressFamily == AddressFamily.InterNetwork && SameSubnet(ua.Address, ua.PrefixLength, router))
+                    return LinkState.RouterSubnet;
+            anyGateway |= props.GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any));
+        }
+        return anyGateway ? LinkState.OtherNetwork : LinkState.NoNetwork;
+    }
+
+    public static bool SameSubnet(IPAddress a, int prefixLength, IPAddress b)
+    {
+        if (prefixLength is <= 0 or > 32) return false;
+        uint mask = prefixLength == 32 ? uint.MaxValue : ~(uint.MaxValue >> prefixLength);
+        uint A(IPAddress ip) => (uint)IPAddress.NetworkToHostOrder(BitConverter.ToInt32(ip.GetAddressBytes(), 0));
+        return (A(a) & mask) == (A(b) & mask);
+    }
 
     /// <summary>Сетевой сбой (нет сети, обрыв, таймаут) — не баг приложения, в crash.log не пишем.</summary>
     public static bool IsNetworkError(Exception ex)
