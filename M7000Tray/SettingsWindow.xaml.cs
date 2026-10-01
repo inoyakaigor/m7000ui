@@ -12,6 +12,9 @@ public sealed partial class SettingsWindow : Window
     readonly Action _onSaved;
     // Что окно само подставило в поля. Отличается от введённого — значит, пользователь правил, и опрос поле не трогает.
     double _shownLimit, _shownRemaining;
+
+    // Версия из сборки: <Version> в M7000Tray.csproj = дата и время сборки (yy.M.d.HHmm).
+    public string AppVersion { get; } = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
     // Последнее состояние от App — показывается, когда поля не редактируются.
     string _status = "";
     double? _percentLeft;

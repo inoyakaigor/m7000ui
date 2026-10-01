@@ -137,8 +137,7 @@
 				FontSize="11"
 				FontWeight="SemiBold"
 				Foreground="AntiqueWhite"
-				Text="1.0.0" />
-			<!--  Text="{x:Bind AppVersion}" /  -->
+				Text="{x:Bind AppVersion}" />
 
 			<TextBlock
 				Grid.Row="0"
