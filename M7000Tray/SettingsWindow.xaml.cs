@@ -37,8 +37,9 @@ public sealed partial class SettingsWindow : Window
             p.IsMaximizable = false;
             p.IsMinimizable = false;
         }
+        // Стартовый размер — только на первый кадр; настоящий считает FitToContent по содержимому.
         double scale = GetDpiForSystem() / 96.0;
-        int w = (int)(340 * scale), h = (int)(430 * scale);
+        int w = (int)(MinWidthDip * scale), h = (int)(430 * scale);
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(area.X + area.Width - w - 12, area.Y + area.Height - h - 12, w, h));
 
@@ -52,16 +53,36 @@ public sealed partial class SettingsWindow : Window
             }
         };
 
-        // Высота — по содержимому: иначе любая новая строка в XAML обрезает кнопку «Сохранить».
-        ((FrameworkElement)Content).Loaded += (_, _) =>
-        {
-            var root = (FrameworkElement)Content;
-            double s = root.XamlRoot.RasterizationScale;
-            root.Measure(new Windows.Foundation.Size(AppWindow.ClientSize.Width / s, double.PositiveInfinity));
-            AppWindow.ResizeClient(new Windows.Graphics.SizeInt32(AppWindow.ClientSize.Width, (int)Math.Ceiling(root.DesiredSize.Height * s)));
-            var size = AppWindow.Size;
-            AppWindow.Move(new Windows.Graphics.PointInt32(area.X + area.Width - size.Width - 12, area.Y + area.Height - size.Height - 12));
-        };
+        ((FrameworkElement)Content).Loaded += (_, _) => FitToContent();
+    }
+
+    const double MinWidthDip = 340, MaxWidthDip = 600;
+
+    /// <summary>
+    /// Размер окна — по содержимому: ширина по самому широкому непереносимому элементу (в пределах Min..Max),
+    /// высота — по всему содержимому при этой ширине. Окно остаётся прижатым к правому нижнему углу.
+    /// </summary>
+    void FitToContent()
+    {
+        var root = (FrameworkElement)Content;
+        if (root.XamlRoot is null) return; // ещё не на экране
+        double s = root.XamlRoot.RasterizationScale;
+
+        // Строка статуса переносится и бывает длинной (текст ошибки) — ширину окна она задавать не должна.
+        var statusVisibility = StatusText.Visibility;
+        StatusText.Visibility = Visibility.Collapsed;
+        root.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+        StatusText.Visibility = statusVisibility;
+        double widthDip = Math.Clamp(Math.Ceiling(root.DesiredSize.Width), MinWidthDip, MaxWidthDip);
+
+        root.Measure(new Windows.Foundation.Size(widthDip, double.PositiveInfinity));
+        var size = new Windows.Graphics.SizeInt32((int)Math.Ceiling(widthDip * s), (int)Math.Ceiling(root.DesiredSize.Height * s));
+        if (size.Width == AppWindow.ClientSize.Width && size.Height == AppWindow.ClientSize.Height) return;
+
+        AppWindow.ResizeClient(size);
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+        var outer = AppWindow.Size;
+        AppWindow.Move(new Windows.Graphics.PointInt32(area.X + area.Width - outer.Width - 12, area.Y + area.Height - outer.Height - 12));
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -115,6 +136,7 @@ public sealed partial class SettingsWindow : Window
             var c = TrayIconRenderer.ColorFor(p);
             StatusBar.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(c.A, c.R, c.G, c.B));
         }
+        FitToContent();
     }
 
     static string SignalTip(RouterSnapshot s)
