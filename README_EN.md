@@ -13,6 +13,24 @@ The application runs in the system tray. Once a minute it logs in to the TP-Link
 - shows a Windows notification for every new SMS;
 - shows battery charge, signal level, 4G and roaming in the settings window.
 
+## Installation
+
+Ready builds are in [Releases](https://github.com/inoyakaigor/m7000ui/releases) — take the [latest release](https://github.com/inoyakaigor/m7000ui/releases/latest). A new release is built automatically once a day if the code has changed.
+
+Each release has two files:
+
+| File | What it is |
+|---|---|
+| `M7000UI-Setup-<version>.exe` | Installer: install folder choice, Start menu shortcut, uninstall from "Installed apps". If Windows App Runtime 2.0 is missing, the installer downloads and installs it (~100 MB) |
+| `M7000UI-<version>-win-x64.zip` | Portable version: unzip to any folder and run `M7000Tray.exe`. Install Windows App Runtime 2.0 yourself ([Microsoft installer](https://aka.ms/windowsappsdk/2.0/latest/windowsappruntimeinstall-x64.exe)) |
+
+1. Download the installer from the latest release and run it.
+2. The installer is not signed, so Windows may show "Windows protected your PC". Click "More info" → "Run anyway".
+3. By default the app is installed for you only, without admin rights. To install for all users, choose it in the first installer window.
+4. After installation the app starts and appears in the tray. Right-click the icon → «Настройки» (settings) and enter the router admin password and the package limit.
+
+To update, run the installer of the new version over the old one: settings are kept. To uninstall, use Settings → Apps → Installed apps; the settings file in `%APPDATA%\Igor Zviagintsev\M7000` stays.
+
 ## Requirements
 
 - **OS:** Windows 10 19041 (20H2) or later
@@ -57,6 +75,8 @@ dotnet run -p:Platform=x64
 Only a tray icon appears — the app has no main window; settings open from the icon menu.
 
 ## Publishing
+
+Releases are built by GitHub Actions (`.github/workflows/release.yml`): every day at 21:59 UTC if there are commits since the last release, and by hand with "Run workflow" on the Actions tab. The installer is built from `installer/M7000.iss` (Inno Setup). Below is how to build the same locally.
 
 ```bash
 dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64 --self-contained true -o publish
