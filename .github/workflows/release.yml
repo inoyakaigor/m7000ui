@@ -1,7 +1,6 @@
 name: Nightly release
 
-# Каждый день в 23:59 по Сербии летом (21:59 UTC; зимой это будет 22:59 — cron в GitHub только в UTC).
-# GitHub может запустить расписание с опозданием на несколько минут — это нормально.
+# Каждый день в 21:59 UTC. GitHub может запустить расписание с опозданием на несколько минут — это нормально.
 on:
   schedule:
     - cron: "59 21 * * *"
@@ -42,17 +41,6 @@ jobs:
           "Last release: $last, changed: $changed, force: $force"
           "build=$($changed -or $force)".ToLower() >> $env:GITHUB_OUTPUT
 
-      # Версия — дата и время сборки (как <Version> в M7000Tray.csproj), но по времени Сербии, а не UTC раннера.
-      - name: Version
-        if: steps.check.outputs.build == 'true'
-        id: version
-        shell: pwsh
-        run: |
-          $now = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Central European Standard Time')
-          $v = '{0}.{1}.{2}.{3}' -f $now.ToString('yy'), $now.Month, $now.Day, [int]$now.ToString('HHmm')
-          "Version: $v"
-          "value=$v" >> $env:GITHUB_OUTPUT
-
       - name: Setup .NET
         if: steps.check.outputs.build == 'true'
         uses: actions/setup-dotnet@v4
@@ -64,7 +52,17 @@ jobs:
         shell: pwsh
         run: >
           dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64
-          --self-contained true -p:Version=${{ steps.version.outputs.value }} -o publish
+          --self-contained true -o publish
+
+      # Версию задаёт <Version> в M7000Tray.csproj (дата и время сборки) — читаем её из готовой сборки.
+      - name: Version
+        if: steps.check.outputs.build == 'true'
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Get-Item publish/M7000Tray.dll).VersionInfo.FileVersion
+          "Version: $v"
+          "value=$v" >> $env:GITHUB_OUTPUT
 
       - name: Zip
         if: steps.check.outputs.build == 'true'
