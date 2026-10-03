@@ -115,3 +115,6 @@ AngularBuild/
 
 ## Local screenshots
 tray icons.png
+
+## Inno Setup output
+installer/Output/

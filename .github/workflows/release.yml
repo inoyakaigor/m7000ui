@@ -1,0 +1,90 @@
+name: Nightly release
+
+# Каждый день в 23:59 по Сербии летом (21:59 UTC; зимой это будет 22:59 — cron в GitHub только в UTC).
+# GitHub может запустить расписание с опозданием на несколько минут — это нормально.
+on:
+  schedule:
+    - cron: "59 21 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Собрать релиз, даже если новых коммитов нет"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # создать тег и релиз
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # нужны теги прошлых релизов
+
+      # Релиз только если с прошлого релиза что-то поменялось (или запуск вручную с force).
+      - name: Check for new commits
+        id: check
+        shell: pwsh
+        run: |
+          $last = gh release list --limit 1 --json tagName --jq '.[0].tagName'
+          $changed = -not $last -or ((git rev-list -n 1 $last) -ne $env:GITHUB_SHA)
+          $force = '${{ inputs.force }}' -eq 'true'
+          "Last release: $last, changed: $changed, force: $force"
+          "build=$($changed -or $force)".ToLower() >> $env:GITHUB_OUTPUT
+
+      # Версия — дата и время сборки (как <Version> в M7000Tray.csproj), но по времени Сербии, а не UTC раннера.
+      - name: Version
+        if: steps.check.outputs.build == 'true'
+        id: version
+        shell: pwsh
+        run: |
+          $now = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Central European Standard Time')
+          $v = '{0}.{1}.{2}.{3}' -f $now.ToString('yy'), $now.Month, $now.Day, [int]$now.ToString('HHmm')
+          "Version: $v"
+          "value=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Setup .NET
+        if: steps.check.outputs.build == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish
+        if: steps.check.outputs.build == 'true'
+        shell: pwsh
+        run: >
+          dotnet publish M7000Tray/M7000Tray.csproj -c Release -r win-x64 -p:Platform=x64
+          --self-contained true -p:Version=${{ steps.version.outputs.value }} -o publish
+
+      - name: Zip
+        if: steps.check.outputs.build == 'true'
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath "M7000UI-${{ steps.version.outputs.value }}-win-x64.zip"
+
+      - name: Installer
+        if: steps.check.outputs.build == 'true'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=${{ steps.version.outputs.value }} /DSourceDir=..\publish installer\M7000.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Release
+        if: steps.check.outputs.build == 'true'
+        shell: pwsh
+        run: |
+          $v = '${{ steps.version.outputs.value }}'
+          gh release create "v$v" `
+            "installer/Output/M7000UI-Setup-$v.exe" `
+            "M7000UI-$v-win-x64.zip" `
+            --target $env:GITHUB_SHA --title "M7000 UI $v" --generate-notes
