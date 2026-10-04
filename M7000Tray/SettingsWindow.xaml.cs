@@ -182,7 +182,9 @@ public sealed partial class SettingsWindow : Window
         double remaining = double.IsNaN(remainingIn) || remainingIn < 0 ? _shownRemaining : remainingIn;
         // Трогаем счётчик, только если пользователь что-то поменял, — иначе не теряем трафик, набежавший пока окно открыто.
         if (limit != _shownLimit || remaining != _shownRemaining)
-            _settings.UsedBytes = Math.Max(0, limit - remaining) * Settings.BytesPerGb;
+            // Без Math.Max(0, …): после продления остаток бывает больше лимита (перенос с прошлого пакета, 25,39 из 25).
+            // Тогда «израсходовано» отрицательное, а процент в трее и в окне упирается в 100%.
+            _settings.UsedBytes = (limit - remaining) * Settings.BytesPerGb;
         _settings.LimitGb = limit;
         _settings.AutoStart = AutoStartInput.IsChecked == true;
         _settings.Save();
